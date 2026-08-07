@@ -5,8 +5,14 @@ class GeocodeRequest(BaseModel):
     address: str = Field(..., description="The raw, messy Indian address input by the user")
 
 class ExtractedEntities(BaseModel):
+    building: Optional[str] = None
+    road: Optional[str] = None
     landmark: Optional[str] = None
+    nearby_place: Optional[str] = None
+    area: Optional[str] = None
     locality: Optional[str] = None
+    village: Optional[str] = None
+    town: Optional[str] = None
     city: Optional[str] = None
     district: Optional[str] = None
     state: Optional[str] = None
@@ -23,6 +29,7 @@ class GeocodeResponse(BaseModel):
     latitude: Optional[float] = None
     longitude: Optional[float] = None
     confidence: str = Field(..., description="High, Medium, or Low")
+    confidenceScore: int = Field(0, description="0-100 confidence score based on match quality")
     evidence: List[str] = []
     agentSteps: List[dict] = []
     nearbyLandmarks: List[LandmarkEvidence] = []

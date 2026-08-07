@@ -1,30 +1,44 @@
-from utils.pincode_loader import get_pincode_info
+from utils.pincode_loader import get_pincode_info, get_city_info
 from typing import Dict, Any, Tuple
 
 class PincodeVerificationAgent:
     """
     Agent 2: Pincode Verification
     Searches the in-memory pincode CSV, validates against extracted data, and returns the centroid.
+    If pincode is missing, uses city or district to estimate search area.
     """
     
-    def verify(self, pincode: str) -> Tuple[bool, Dict[str, Any], str]:
+    def verify(self, pincode: str, city: str = None) -> Tuple[bool, Dict[str, Any], str]:
         """
         Returns (is_valid, centroid_data, evidence_string)
         """
-        if not pincode:
-            return False, {}, "No pincode extracted from address."
-            
-        data = get_pincode_info(pincode)
+        data = None
+        evidence = ""
+        is_exact = False
         
+        if pincode:
+            data = get_pincode_info(pincode)
+            if data:
+                is_exact = True
+                evidence = f"Pincode {pincode} verified: Maps to {data.get('district', 'Unknown District')}, {data.get('state', 'Unknown State')}."
+            else:
+                evidence = f"Pincode {pincode} not found in database or invalid."
+                
+        # Fallback to City if Pincode is missing or invalid
+        if not data and city:
+            data = get_city_info(city)
+            if data:
+                is_exact = False # It's a fallback match, confidence will be slightly lower
+                evidence += f" Fallback: Found centroid for city '{city}' in {data.get('state', 'Unknown State')}."
+                
         if not data:
-            return False, {}, f"Pincode {pincode} not found in database or invalid."
+            return False, {}, evidence if evidence else "No pincode or recognizable city extracted from address."
             
-        # We assume the CSV has 'latitude' and 'longitude', 'district', 'state'
         lat = float(data.get('latitude', 0.0))
         lon = float(data.get('longitude', 0.0))
         
         if lat == 0.0 and lon == 0.0:
-            return False, data, f"Pincode {pincode} found, but no geographic centroid available."
+            return False, data, f"Location found, but no geographic centroid available."
             
-        evidence = f"Pincode {pincode} verified: Maps to {data.get('district', 'Unknown District')}, {data.get('state', 'Unknown State')}."
+        data['is_exact_pincode'] = is_exact
         return True, data, evidence

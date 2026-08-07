@@ -5,7 +5,8 @@ import {
   signInWithPopup, 
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword,
-  signOut 
+  signOut,
+  updatePassword
 } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 
@@ -102,13 +103,24 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const updateUserPassword = async (newPassword) => {
+    if (!auth.currentUser) throw new Error("No user is currently signed in.");
+    try {
+      await updatePassword(auth.currentUser, newPassword);
+    } catch (error) {
+      console.error("Failed to set password", error);
+      throw error;
+    }
+  };
+
   const value = {
     currentUser,
     userRole,
     loginWithGoogle,
     loginWithEmail,
     registerWithEmail,
-    logout
+    logout,
+    updateUserPassword
   };
 
   return (

@@ -4,7 +4,8 @@ const { db } = require('../firebase/firebase');
 
 const locateAddress = async (req, res, next) => {
     try {
-        const { address, userId } = req.body;
+        const { address } = req.body;
+        const userId = req.user ? req.user.uid : 'anonymous';
         
         if (!address) {
             return res.status(400).json({ success: false, message: 'Address is required' });
@@ -41,7 +42,7 @@ const locateAddress = async (req, res, next) => {
 
         const processingTime = Date.now() - startTime;
 
-        // 3. Save to Firebase (Addresses Collection)
+        // 3. Save to Firebase (search_history Collection)
         const addressData = {
             originalAddress: address,
             normalizedAddress: aiResponse.normalizedAddress,
@@ -53,11 +54,12 @@ const locateAddress = async (req, res, next) => {
             agentSteps: aiResponse.agentSteps || [],
             nearbyLandmarks: aiResponse.nearbyLandmarks || [],
             processingTime,
+            timestamp: Date.now(),
             createdAt: new Date().toISOString(),
-            userId: userId || 'anonymous'
+            userId: userId
         };
 
-        const addressDocRef = await db.collection('addresses').add(addressData);
+        const addressDocRef = await db.collection('search_history').add(addressData);
 
         // 4. Update Cache (Only if Confidence is High or Medium)
         if (['High', 'Medium'].includes(aiResponse.confidence)) {
@@ -76,10 +78,49 @@ const locateAddress = async (req, res, next) => {
             originalAddress: address,
             correctedAddress: aiResponse.normalizedAddress,
             reason: `Geocoded with ${aiResponse.confidence} confidence`,
-            timestamp: new Date().toISOString()
+            timestamp: new Date().toISOString(),
+            userId: userId
         });
 
-        // 6. Return Response
+        // 6. Update Analytics via Transaction
+        const analyticsRef = db.collection('analytics').doc('global_stats');
+        try {
+            await db.runTransaction(async (transaction) => {
+                const analyticsDoc = await transaction.get(analyticsRef);
+                
+                let stats = {
+                    totalRequests: 0,
+                    highConfidenceCount: 0,
+                    lowConfidenceCount: 0,
+                    averageResponseTime: 0
+                };
+
+                if (analyticsDoc.exists) {
+                    stats = analyticsDoc.data();
+                }
+
+                const newTotal = (stats.totalRequests || 0) + 1;
+                const newHigh = (stats.highConfidenceCount || 0) + (aiResponse.confidence === 'High' ? 1 : 0);
+                const newLow = (stats.lowConfidenceCount || 0) + (aiResponse.confidence === 'Low' ? 1 : 0);
+                
+                // Moving average for response time
+                const prevTotalTime = (stats.totalRequests || 0) * (stats.averageResponseTime || 0);
+                const newAverage = (prevTotalTime + processingTime) / newTotal;
+
+                transaction.set(analyticsRef, {
+                    totalRequests: newTotal,
+                    highConfidenceCount: newHigh,
+                    lowConfidenceCount: newLow,
+                    averageResponseTime: newAverage,
+                    lastUpdated: new Date().toISOString()
+                }, { merge: true });
+            });
+        } catch (analyticsError) {
+            console.error('Error updating analytics:', analyticsError);
+            // Don't fail the request if analytics update fails
+        }
+
+        // 7. Return Response
         res.status(200).json({
             success: true,
             source: 'ai_service',

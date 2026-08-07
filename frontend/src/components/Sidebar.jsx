@@ -56,10 +56,10 @@ const Sidebar = () => {
             <span>Login</span>
           </button>
         )}
-        <button className="flex items-center space-x-3 px-4 py-3 w-full text-left text-slate-400 hover:bg-slate-800 rounded-xl transition-all duration-200">
+        <NavLink to="/settings" className={({ isActive }) => clsx("flex items-center space-x-3 px-4 py-3 w-full text-left rounded-xl transition-all duration-200", isActive ? "bg-slate-800 text-white" : "text-slate-400 hover:bg-slate-800")}>
           <Settings size={20} />
           <span>Settings</span>
-        </button>
+        </NavLink>
       </div>
     </div>
   );

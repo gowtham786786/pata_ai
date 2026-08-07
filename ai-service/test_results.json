@@ -1,0 +1,62 @@
+[
+  {
+    "originalAddress": "Near Railway Station, Patna, 800001",
+    "normalizedAddress": "Railway Station, Unknown, Unknown, 800001",
+    "latitude": null,
+    "longitude": null,
+    "confidence": "Low",
+    "confidenceScore": 0,
+    "evidence": [
+      "Agent 1: Extracted Pincode '800001'.",
+      "Agent 1: Extracted Landmark 'railway station'.",
+      "Agent 2: Pincode 800001 not found in database or invalid.",
+      "Agent 3: Cannot verify landmark 'railway station' because centroid is missing.",
+      "Agent 4: Confidence Score: 0/100 (Low). Exact Pincode: False, Landmark Matches: 0.",
+      "Agent 5: Self Check Flag: Insufficient data to locate safely. No silent guess allowed."
+    ],
+    "agentSteps": [
+      {
+        "id": 1,
+        "name": "Agent 1: Address Parser",
+        "result": "Extracted Pincode: 800001",
+        "detail": "Found Landmark: railway station",
+        "timeMs": 1,
+        "status": "success"
+      },
+      {
+        "id": 2,
+        "name": "Agent 2: Pincode Verifier",
+        "result": "Pincode 800001 not found in da...",
+        "detail": "Pincode 800001 not found in database or invalid.",
+        "timeMs": 3,
+        "status": "warning"
+      },
+      {
+        "id": 3,
+        "name": "Agent 3: Landmark Search",
+        "result": "No landmark verified.",
+        "detail": "Cannot verify landmark 'railway station' because centroid is missing.",
+        "timeMs": 1,
+        "status": "warning"
+      },
+      {
+        "id": 4,
+        "name": "Agent 4: Confidence Score",
+        "result": "Scored: 0/100 (Low)",
+        "detail": "Confidence Score: 0/100 (Low). Exact Pincode: False, Landmark Matches: 0.",
+        "timeMs": 1,
+        "status": "warning"
+      },
+      {
+        "id": 5,
+        "name": "Agent 5: Self Check",
+        "result": "Conflicts resolved. Final payload ready.",
+        "detail": "Self Check Flag: Insufficient data to locate safely. No silent guess allowed.",
+        "timeMs": 1,
+        "status": "success"
+      }
+    ],
+    "nearbyLandmarks": [],
+    "processingTimeMs": 3
+  }
+]

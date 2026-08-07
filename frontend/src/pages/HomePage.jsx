@@ -50,8 +50,11 @@ const HomePage = () => {
     setErrorMsg('');
     
     try {
-      // Connect to the Node.js Orchestrator via API Service
-      const responseData = await locateAddress(address);
+      // Get the Firebase Auth token if the user is logged in
+      const token = currentUser ? await currentUser.getIdToken() : null;
+      
+      // Connect to the Node.js Orchestrator via API Service, passing the token
+      const responseData = await locateAddress(address, token);
       
       if (responseData.success) {
         const payload = responseData.data;
