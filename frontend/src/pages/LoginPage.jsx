@@ -31,7 +31,11 @@ const LoginPage = () => {
       navigate('/');
     } catch (err) {
       console.error(err);
-      setError('Failed to authenticate: ' + err.message);
+      if (err.code === 'auth/invalid-credential' || err.message.includes('auth/invalid-credential')) {
+        setError('Invalid credentials. Please check your email and password.');
+      } else {
+        setError('Failed to authenticate: ' + err.message);
+      }
     }
     setLoading(false);
   };

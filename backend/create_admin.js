@@ -1,10 +1,11 @@
-const admin = require('firebase-admin');
+const { initializeApp, getApps, cert } = require('firebase-admin/app');
+const { getAuth } = require('firebase-admin/auth');
+const { getFirestore } = require('firebase-admin/firestore');
 require('dotenv').config();
 
-// Check if Firebase admin is already initialized
-if (!admin.apps.length) {
-    admin.initializeApp({
-      credential: admin.credential.cert({
+if (!getApps().length) {
+    initializeApp({
+      credential: cert({
         projectId: process.env.FIREBASE_PROJECT_ID,
         clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
         privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
@@ -12,7 +13,7 @@ if (!admin.apps.length) {
     });
 }
 
-const db = admin.firestore();
+const db = getFirestore();
 
 async function createAdmin() {
     const email = "reddygowtham397@gmail.com";
@@ -22,14 +23,12 @@ async function createAdmin() {
     try {
         let userRecord;
         try {
-            // Check if user already exists
-            userRecord = await admin.auth().getUserByEmail(email);
+            userRecord = await getAuth().getUserByEmail(email);
             console.log("User already exists in Auth. Updating password...");
-            await admin.auth().updateUser(userRecord.uid, { password });
+            await getAuth().updateUser(userRecord.uid, { password });
         } catch (e) {
-            // User doesn't exist, create them
             console.log("Creating new user in Auth...");
-            userRecord = await admin.auth().createUser({
+            userRecord = await getAuth().createUser({
                 email,
                 password,
                 displayName: name,
@@ -38,7 +37,6 @@ async function createAdmin() {
 
         console.log(`Successfully created/updated user in Auth: ${userRecord.uid}`);
 
-        // Set role to 'admin' in Firestore
         await db.collection('users').doc(userRecord.uid).set({
             uid: userRecord.uid,
             name: name,
