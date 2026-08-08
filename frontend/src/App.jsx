@@ -17,6 +17,7 @@ import APIMonitor from './pages/APIMonitor';
 import DatasetManager from './pages/DatasetManager';
 import { CacheManager, AnalyticsDashboard, SystemLogs, AuditLogs, SecurityConfig, SystemConfig } from './pages/AdminPlaceholders';
 import LoginPage from './pages/LoginPage';
+import WelcomeScreen from './pages/WelcomeScreen';
 import SettingsPage from './pages/SettingsPage';
 import ProtectedRoute from './components/ProtectedRoute';
 import AnimatedBackground from './components/AnimatedBackground';
@@ -34,7 +35,7 @@ function App() {
           currentUser ? (
             userRole === 'admin' ? <Navigate to="/admin" replace /> : <Navigate to="/user" replace />
           ) : (
-            <Navigate to="/login" replace />
+            <WelcomeScreen />
           )
         } />
 

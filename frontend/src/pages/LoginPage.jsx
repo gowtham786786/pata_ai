@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { useNavigate } from 'react-router-dom';
-import { Eye, EyeOff } from 'lucide-react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { Eye, EyeOff, ArrowLeft } from 'lucide-react';
 
 const LoginPage = () => {
   const { loginWithGoogle, loginWithEmail, registerWithEmail } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const portalIntent = location.state?.portal || 'user'; // 'admin' or 'user'
   
   const [isRegister, setIsRegister] = useState(false);
   const [email, setEmail] = useState('');
@@ -48,10 +50,18 @@ const LoginPage = () => {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-navy-950 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8 bg-white dark:bg-navy-900 p-10 rounded-2xl shadow-xl border border-gray-100 dark:border-navy-800">
+      <div className="max-w-md w-full space-y-8 bg-white dark:bg-navy-900 p-10 rounded-2xl shadow-xl border border-gray-100 dark:border-navy-800 relative">
+        <button
+          onClick={() => navigate('/')}
+          className="absolute top-6 left-6 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors flex items-center text-sm font-medium"
+        >
+          <ArrowLeft size={16} className="mr-1" /> Back
+        </button>
         <div>
           <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight">
-            {isRegister ? 'Create an account' : 'Sign in to your account'}
+            {isRegister 
+              ? 'Create an account' 
+              : (portalIntent === 'admin' ? 'Login to Admin Portal' : 'Login to User Portal')}
           </h2>
         </div>
         
@@ -116,7 +126,7 @@ const LoginPage = () => {
               disabled={loading}
               className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 transition-colors"
             >
-              {loading ? 'Processing...' : (isRegister ? 'Sign Up' : 'Sign In')}
+              {loading ? 'Processing...' : (isRegister ? 'Sign Up' : 'Login')}
             </button>
           </div>
         </form>
@@ -153,7 +163,7 @@ const LoginPage = () => {
               onClick={() => setIsRegister(!isRegister)}
               className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
             >
-              {isRegister ? 'Already have an account? Sign In' : 'Need an account? Sign Up'}
+              {isRegister ? 'Already have an account? Login' : 'Need an account? Sign Up'}
             </button>
         </div>
       </div>
