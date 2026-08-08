@@ -1,11 +1,12 @@
 import React from 'react';
+import { createPortal } from 'react-dom';
 import { X, CheckCircle2, ShieldAlert, Code2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const EvidenceModal = ({ isOpen, onClose, result }) => {
   if (!isOpen || !result) return null;
 
-  return (
+  return createPortal(
     <AnimatePresence>
       <motion.div
         initial={{ opacity: 0 }}
@@ -106,7 +107,8 @@ const EvidenceModal = ({ isOpen, onClose, result }) => {
           </div>
         </motion.div>
       </motion.div>
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   );
 };
 

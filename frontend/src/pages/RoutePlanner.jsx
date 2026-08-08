@@ -1,9 +1,23 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Route, Plus, Trash2, AlertTriangle, Loader2, MapPin, CheckCircle, Navigation } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { Route, Plus, Trash2, AlertTriangle, Loader2, MapPin, CheckCircle, Navigation, X, Clock, Map, Truck } from 'lucide-react';
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import { useAuth } from '../context/AuthContext';
 import { locateAddress } from '../services/apiService';
+
+// Haversine distance calculation
+const getDistanceFromLatLonInKm = (lat1, lon1, lat2, lon2) => {
+  const R = 6371; // Radius of the earth in km
+  const dLat = (lat2 - lat1) * (Math.PI/180);
+  const dLon = (lon2 - lon1) * (Math.PI/180); 
+  const a = 
+    Math.sin(dLat/2) * Math.sin(dLat/2) +
+    Math.cos(lat1 * (Math.PI/180)) * Math.cos(lat2 * (Math.PI/180)) * 
+    Math.sin(dLon/2) * Math.sin(dLon/2); 
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); 
+  return R * c; // Distance in km
+};
 
 // Component to adjust map bounds
 const MapBounds = ({ stops, isCalculated }) => {
@@ -25,6 +39,141 @@ const MapBounds = ({ stops, isCalculated }) => {
   return null;
 };
 
+const RouteSummaryModal = ({ isOpen, onClose, stops }) => {
+  if (!isOpen) return null;
+
+  const validStops = stops.filter(s => s.resolvedData?.latitude && s.resolvedData?.longitude);
+  
+  let totalDistance = 0;
+  const legs = [];
+
+  for (let i = 0; i < validStops.length - 1; i++) {
+    const p1 = validStops[i];
+    const p2 = validStops[i+1];
+    const dist = getDistanceFromLatLonInKm(
+      p1.resolvedData.latitude, p1.resolvedData.longitude,
+      p2.resolvedData.latitude, p2.resolvedData.longitude
+    );
+    totalDistance += dist;
+    
+    // Add 20% for road distance approximation
+    const roadDist = dist * 1.2;
+    
+    legs.push({
+      from: p1,
+      to: p2,
+      straightDist: dist,
+      roadDist: roadDist,
+      timeHrs: roadDist / 40 // assuming 40 km/h avg truck speed
+    });
+  }
+
+  const totalRoadDistance = totalDistance * 1.2;
+  const totalTimeHrs = totalRoadDistance / 40;
+  const totalTimeStr = `${Math.floor(totalTimeHrs)}h ${Math.round((totalTimeHrs % 1) * 60)}m`;
+
+  return createPortal(
+    <div className="fixed inset-0 z-[9999] flex justify-end bg-black/60 backdrop-blur-sm transition-all">
+      <div className="w-full max-w-lg h-full bg-navy-950 border-l border-slate-800 shadow-2xl flex flex-col animate-slide-in-right">
+        {/* Header */}
+        <div className="flex items-center justify-between p-6 border-b border-slate-800 bg-navy-900">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-electric/20 text-electric flex items-center justify-center border border-electric/30">
+              <Navigation className="w-5 h-5" />
+            </div>
+            <div>
+               <h2 className="text-xl font-bold text-slate-100 uppercase tracking-wider">Route Summary</h2>
+               <p className="text-xs text-slate-400 font-mono">Calculated Logistics Plan</p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="text-slate-400 hover:text-white transition-colors bg-navy-800 hover:bg-slate-700 p-2 rounded-lg"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+          {/* Key Metrics */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="bg-navy-900 p-4 rounded-xl border border-slate-800 flex flex-col items-center justify-center text-center">
+              <Map className="w-6 h-6 text-emerald-400 mb-2" />
+              <span className="text-2xl font-bold text-slate-100">{totalRoadDistance.toFixed(1)} <span className="text-sm font-normal text-slate-500">km</span></span>
+              <span className="text-[10px] uppercase tracking-widest text-slate-500 mt-1">Total Distance</span>
+            </div>
+            <div className="bg-navy-900 p-4 rounded-xl border border-slate-800 flex flex-col items-center justify-center text-center">
+              <Clock className="w-6 h-6 text-blue-400 mb-2" />
+              <span className="text-2xl font-bold text-slate-100">{totalTimeStr}</span>
+              <span className="text-[10px] uppercase tracking-widest text-slate-500 mt-1">Est. Travel Time</span>
+            </div>
+          </div>
+
+          <div className="bg-electric/10 border border-electric/20 rounded-lg p-4 flex items-start gap-3">
+            <Truck className="w-5 h-5 text-electric shrink-0 mt-0.5" />
+            <p className="text-xs text-slate-300 leading-relaxed">
+              Estimates are based on straight-line distances with a 20% road routing buffer and an average commercial vehicle speed of 40 km/h.
+            </p>
+          </div>
+
+          {/* Route Legs */}
+          <div>
+            <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4">Route Breakdown</h3>
+            <div className="relative">
+              <div className="absolute left-4 top-4 bottom-4 w-0.5 bg-slate-800"></div>
+              <div className="space-y-6 relative">
+                {validStops.map((stop, index) => {
+                  const leg = legs[index];
+                  return (
+                    <div key={stop.id} className="relative pl-10">
+                      <div className="absolute left-[11px] top-1 w-3 h-3 rounded-full border-2 border-navy-950 bg-electric"></div>
+                      <div className="bg-navy-900 p-4 rounded-lg border border-slate-800 shadow-sm">
+                        <div className="text-[10px] font-bold text-electric uppercase tracking-widest mb-1">{stop.label}</div>
+                        <div className="text-sm font-medium text-slate-200">{stop.resolvedData.correctedAddress || stop.resolvedData.normalizedAddress}</div>
+                        
+                        {leg && (
+                          <div className="mt-4 pt-3 border-t border-slate-800/50 grid grid-cols-2 gap-2 text-xs">
+                            <div>
+                              <span className="text-slate-500 block mb-0.5">Distance to next</span>
+                              <span className="font-mono text-slate-300">{leg.roadDist.toFixed(1)} km</span>
+                            </div>
+                            <div>
+                              <span className="text-slate-500 block mb-0.5">Time to next</span>
+                              <span className="font-mono text-slate-300">{Math.floor(leg.timeHrs)}h {Math.round((leg.timeHrs % 1) * 60)}m</span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        {/* Footer */}
+        <div className="p-6 border-t border-slate-800 bg-navy-900">
+           <button className="w-full py-3 bg-electric hover:bg-blue-600 text-white font-bold rounded-lg uppercase tracking-widest transition-colors shadow-glow-cyan">
+             Dispatch Route to Driver
+           </button>
+        </div>
+      </div>
+      <style dangerouslySetInnerHTML={{__html: `
+        @keyframes slideInRight {
+          from { transform: translateX(100%); }
+          to { transform: translateX(0); }
+        }
+        .animate-slide-in-right {
+          animation: slideInRight 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+      `}} />
+    </div>,
+    document.body
+  );
+};
+
 const RoutePlanner = () => {
   const { currentUser } = useAuth();
   const [stops, setStops] = useState([
@@ -32,6 +181,7 @@ const RoutePlanner = () => {
     { id: 'stop-1', inputString: '', resolvedData: null, loading: false, label: 'Drop 1' }
   ]);
   const [isCalculated, setIsCalculated] = useState(false);
+  const [showSummary, setShowSummary] = useState(false);
 
   const handleAddStop = () => {
     const newId = `stop-${Date.now()}`;
@@ -64,12 +214,12 @@ const RoutePlanner = () => {
     
     try {
       const token = currentUser ? await currentUser.getIdToken() : null;
-      const result = await locateAddress(stop.inputString, token);
+      const response = await locateAddress(stop.inputString, token);
       
       setStops(prev => prev.map(s => {
         if (s.id === id) {
-          if (result && result.latitude && result.longitude) {
-            return { ...s, loading: false, resolvedData: result };
+          if (response && response.success && response.data && response.data.latitude && response.data.longitude) {
+            return { ...s, loading: false, resolvedData: response.data };
           }
           return { ...s, loading: false, resolvedData: { error: 'Could not resolve address' } };
         }
@@ -87,6 +237,7 @@ const RoutePlanner = () => {
   const handleCalculateRoute = () => {
     if (canCalculate) {
       setIsCalculated(true);
+      setShowSummary(true);
     }
   };
 
@@ -216,8 +367,18 @@ const RoutePlanner = () => {
                }`}
              >
                <Navigation size={16} className="mr-2" />
-               {isCalculated ? 'Recalculate Route' : 'Calculate Route'}
+               Calculate Route
              </button>
+             
+             {isCalculated && (
+               <button 
+                 onClick={() => setShowSummary(true)}
+                 className="w-full mt-3 py-2 border border-slate-700 hover:bg-slate-800 text-slate-300 rounded font-mono text-xs uppercase tracking-widest transition-colors flex items-center justify-center"
+               >
+                 View Route Details
+               </button>
+             )}
+
              {!canCalculate && (
                 <p className="text-center text-[10px] text-slate-500 mt-2">Resolve at least 2 locations to calculate</p>
              )}
@@ -261,6 +422,12 @@ const RoutePlanner = () => {
             </MapContainer>
         </div>
       </div>
+      
+      <RouteSummaryModal 
+        isOpen={showSummary} 
+        onClose={() => setShowSummary(false)} 
+        stops={stops} 
+      />
     </div>
   );
 };
