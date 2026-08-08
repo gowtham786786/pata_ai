@@ -86,12 +86,7 @@ class ScoringEngine:
             cand['total_score'] = min(100, score)
             cand['evidence_details'] = evidence
             
-            # DEMO OVERRIDE: Match user's exact presentation scores
-            if "Ganesh Temple #" in cand.get("name", ""):
-                if cand["name"] == "Ganesh Temple #1": cand['total_score'] = 93
-                elif cand["name"] == "Ganesh Temple #2": cand['total_score'] = 81
-                elif cand["name"] == "Ganesh Temple #3": cand['total_score'] = 47
-                elif cand["name"] == "Ganesh Temple #4": cand['total_score'] = 31
+
             
         candidates.sort(key=lambda x: -x.get('total_score', 0))
         return candidates
