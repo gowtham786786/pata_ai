@@ -1,10 +1,14 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
-import { X, CheckCircle2, ShieldAlert, Code2 } from 'lucide-react';
+import { X, CheckCircle2, ShieldAlert, Code2, MapPin } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const EvidenceModal = ({ isOpen, onClose, result }) => {
   if (!isOpen || !result) return null;
+  
+  // Find the selected candidate to show the exact evidence
+  const candidate = result.candidates?.find(c => c.lat === result.latitude && c.lon === result.longitude) || {};
+  const ev = candidate.evidence_details || {};
 
   return createPortal(
     <AnimatePresence>
@@ -29,7 +33,7 @@ const EvidenceModal = ({ isOpen, onClose, result }) => {
                 <ShieldAlert className="w-4 h-4" />
               </div>
               <h2 className="text-lg font-bold text-slate-200 uppercase tracking-wider">
-                Full Evidence Log
+                Geospatial Evidence Audit
               </h2>
             </div>
             <button
@@ -43,29 +47,54 @@ const EvidenceModal = ({ isOpen, onClose, result }) => {
           {/* Body */}
           <div className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar">
             
-            {/* Resolution Summary */}
+            {/* WHY THIS LOCATION Section */}
             <div>
               <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3 flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-electric" />
-                Resolution Summary
+                <MapPin className="w-4 h-4 text-electric" />
+                WHY THIS LOCATION?
               </h3>
-              <div className="bg-navy-900 p-4 rounded-lg border border-slate-800 grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <span className="block text-[10px] uppercase text-slate-500 mb-1">Normalized Address</span>
-                  <span className="text-sm font-medium text-slate-300">{result.normalizedAddress || 'N/A'}</span>
-                </div>
-                <div>
-                  <span className="block text-[10px] uppercase text-slate-500 mb-1">Coordinates</span>
-                  <span className="text-sm font-mono text-electric">{result.latitude ? `${result.latitude}, ${result.longitude}` : 'N/A'}</span>
-                </div>
-                <div>
-                  <span className="block text-[10px] uppercase text-slate-500 mb-1">Confidence Score</span>
-                  <span className="text-sm font-bold text-signal-high">{result.confidenceScore || 0}/100</span>
-                </div>
-                <div>
-                  <span className="block text-[10px] uppercase text-slate-500 mb-1">Processing Time</span>
-                  <span className="text-sm font-mono text-slate-300">{result.processingTimeMs || '< 50'} ms</span>
-                </div>
+              
+              <div className="bg-navy-900 rounded-lg border border-slate-800 overflow-hidden">
+                 <table className="w-full text-left text-sm text-slate-300">
+                    <tbody className="divide-y divide-slate-800/50">
+                       <tr className="hover:bg-slate-800/20">
+                          <td className="px-4 py-3 font-semibold text-slate-400">Pincode</td>
+                          <td className="px-4 py-3">{ev.pincode_match === true ? 'Match' : (ev.pincode_match || 'Mismatch/Unknown')}</td>
+                       </tr>
+                       <tr className="hover:bg-slate-800/20">
+                          <td className="px-4 py-3 font-semibold text-slate-400">City</td>
+                          <td className="px-4 py-3">{ev.city_match === true ? 'Match' : (ev.city_match || 'Mismatch/Unknown')}</td>
+                       </tr>
+                       <tr className="hover:bg-slate-800/20">
+                          <td className="px-4 py-3 font-semibold text-slate-400">Locality</td>
+                          <td className="px-4 py-3">{ev.locality_match === true ? 'Match' : (ev.locality_match || 'Mismatch/Unknown')}</td>
+                       </tr>
+                       <tr className="hover:bg-slate-800/20">
+                          <td className="px-4 py-3 font-semibold text-slate-400">Landmark</td>
+                          <td className="px-4 py-3">{ev.landmark_match === true ? 'Match' : (ev.landmark_match || 'Mismatch/Unknown')}</td>
+                       </tr>
+                       <tr className="hover:bg-slate-800/20">
+                          <td className="px-4 py-3 font-semibold text-slate-400">OSM Verified</td>
+                          <td className="px-4 py-3">{candidate.source === 'OpenStreetMap' ? 'Yes' : 'No'}</td>
+                       </tr>
+                       <tr className="hover:bg-slate-800/20">
+                          <td className="px-4 py-3 font-semibold text-slate-400">Distance from Pincode Centroid</td>
+                          <td className="px-4 py-3">{candidate.distance_from_ref ? `${Math.round(candidate.distance_from_ref)} meters` : 'N/A'}</td>
+                       </tr>
+                       <tr className="hover:bg-slate-800/20">
+                          <td className="px-4 py-3 font-semibold text-slate-400">Direction Match</td>
+                          <td className="px-4 py-3">{ev.direction_match || 'Not Evaluated'}</td>
+                       </tr>
+                       <tr className="hover:bg-slate-800/20">
+                          <td className="px-4 py-3 font-semibold text-slate-400">Final Score</td>
+                          <td className="px-4 py-3 font-bold text-signal-high">{candidate.total_score || result.confidenceScore || 0}/100</td>
+                       </tr>
+                       <tr className="hover:bg-slate-800/20">
+                          <td className="px-4 py-3 font-semibold text-slate-400">Source</td>
+                          <td className="px-4 py-3">{candidate.source || result.locationSource || 'Unknown'}</td>
+                       </tr>
+                    </tbody>
+                 </table>
               </div>
             </div>
 
@@ -78,10 +107,10 @@ const EvidenceModal = ({ isOpen, onClose, result }) => {
               <div className="bg-[#0a0f1c] rounded-lg border border-slate-800 p-4 font-mono text-xs text-slate-300 overflow-x-auto">
                 {result.evidence && result.evidence.length > 0 ? (
                   <ul className="space-y-2">
-                    {result.evidence.map((ev, idx) => (
+                    {result.evidence.map((evItem, idx) => (
                       <li key={idx} className="flex gap-3">
                         <span className="text-slate-600 select-none">[{String(idx + 1).padStart(2, '0')}]</span>
-                        <span className="text-emerald-400">{ev}</span>
+                        <span className="text-emerald-400">{evItem}</span>
                       </li>
                     ))}
                   </ul>

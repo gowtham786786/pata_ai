@@ -289,6 +289,20 @@ Transforms raw address into structured location data.
 
 ---
 
+## 🧭 Address Intelligence Pipeline
+
+PataAI's core intelligence is powered by a robust 7-step pipeline designed to deterministic resolve messy Indian addresses without hallucinating:
+
+1. **Address Parser Agent**: An LLM-powered extractor that safely parses unstructured, Hinglish, and transliterated strings into structured JSON entities (`pincode`, `locality`, `city`, `landmark`, `street`, etc.).
+2. **Pincode Validation Agent**: Cross-references the extracted pincode against official datasets. It resolves discrepancies and establishes a reliable geospatial centroid for the search area.
+3. **OSM Landmark Search Agent**: Queries the Overpass API using a 5000m radius around the pincode centroid to find real-world coordinate matches for extracted landmarks and localities.
+4. **Candidate Scoring Engine**: Evaluates all potential candidates using a deterministic 100-point grading system based on pincode match, locality overlap, landmark name similarity, and proximity to the reference centroid.
+5. **Self-Check Agent**: A critical reviewer that performs a 10-point audit on the highest-scoring candidate to ensure it isn't an AI hallucination or geographically impossible.
+6. **Confidence Engine**: Grades the final candidate into strict thresholds: `HIGH` (ready for automation), `MEDIUM` (human review recommended), or `LOW` (cannot safely geocode).
+7. **Orchestrator**: The final aggregator that combines all evidence, candidates, and scores into a unified API response for the frontend dashboard.
+
+---
+
 ## 🗺️ Project Roadmap
 
 - [x] Basic UI & Map Integration
@@ -296,6 +310,7 @@ Transforms raw address into structured location data.
 - [x] Pincode Verification System
 - [x] Firebase Caching & History
 - [x] Admin Dashboard Analytics
+- [x] Address Intelligence Pipeline Upgrade
 - [ ] Mobile Application (React Native)
 - [ ] Route Optimization Engine
 

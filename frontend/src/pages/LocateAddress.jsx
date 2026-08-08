@@ -1,16 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, ZoomControl, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
-import { Search as SearchIcon, Loader2 } from 'lucide-react';
+import { Search as SearchIcon, Loader2, MapPin, CheckCircle2 } from 'lucide-react';
 import clsx from 'clsx';
 import { locateAddress } from '../services/apiService';
 import { useAuth } from '../context/AuthContext';
-import ConfidenceRing from '../components/ConfidenceRing';
 import AgentFeed from '../components/AgentFeed';
 import TopNavigation from '../components/TopNavigation';
 import MetricCards from '../components/MetricCards';
+import EvidenceModal from '../components/EvidenceModal'; // Assuming we have it
 
-// Fix Leaflet marker icon issue
 import L from 'leaflet';
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
 import markerIcon from 'leaflet/dist/images/marker-icon.png';
@@ -23,25 +22,35 @@ L.Icon.Default.mergeOptions({
   shadowUrl: markerShadow,
 });
 
-// Component to handle dynamic map centering
-const MapController = ({ center, zoom }) => {
+// Custom candidate icon
+const candidateIcon = new L.Icon({
+  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-grey.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  shadowSize: [41, 41]
+});
+
+const MapController = ({ center, zoom, bounds }) => {
   const map = useMap();
   useEffect(() => {
-    if (center) {
-      map.flyTo(center, zoom, {
-        duration: 2 // smooth animation
-      });
+    if (bounds && bounds.length > 0) {
+      map.fitBounds(bounds, { padding: [50, 50] });
+    } else if (center) {
+      map.flyTo(center, zoom, { duration: 2 });
     }
-  }, [center, zoom, map]);
+  }, [center, zoom, bounds, map]);
   return null;
 };
 
-const HomePage = () => {
+const LocateAddress = () => {
   const [address, setAddress] = useState('');
-  const [status, setStatus] = useState('idle'); // idle, resolving, resolved, error
+  const [status, setStatus] = useState('idle'); // idle, resolving, resolved, error, conflict
   const [result, setResult] = useState(null);
   const [errorMsg, setErrorMsg] = useState('');
   const [conflictData, setConflictData] = useState(null);
+  const [showEvidence, setShowEvidence] = useState(false);
 
   const { currentUser } = useAuth();
 
@@ -52,25 +61,23 @@ const HomePage = () => {
     setStatus('resolving');
     setErrorMsg('');
     setConflictData(null);
+    setResult(null);
     
     try {
-      // Get the Firebase Auth token if the user is logged in
       const token = currentUser ? await currentUser.getIdToken() : null;
-      
-      // Connect to the Node.js Orchestrator via API Service, passing the token and forceSource
       const responseData = await locateAddress(address, token, forceSource);
       
       if (responseData.success) {
         const payload = responseData.data;
         
-        // Immediately set the result so AgentFeed has access to payload.agentSteps
+        // Pass candidates down
+        payload.candidates = responseData.candidates || [];
+        payload.parsedEntities = responseData.parsedEntities || {};
+        
         setResult(payload);
         
-        // Calculate the exact real time the backend took for all agents combined
         const totalRealTimeMs = payload.agentSteps ? payload.agentSteps.reduce((acc, step) => acc + (step.timeMs || 10), 0) : 100;
         
-        // We wait for the feed animation to finish, which now perfectly matches the real backend execution time!
-        // Add a 50ms buffer to ensure React state has settled on the final step
         setTimeout(() => {
            setStatus('resolved');
         }, totalRealTimeMs + 50);
@@ -88,21 +95,20 @@ const HomePage = () => {
     }
   };
 
-  // Safe extractors for the UI
-  const extractedPincode = result?.evidence?.find(e => e.includes('Pincode')) ? result.evidence.find(e => e.includes('Pincode')).split("'")[1] : (status === 'resolved' ? 'N/A' : '— awaiting input');
-  const extractedLandmark = result?.evidence?.find(e => e.includes('Landmark')) ? result.evidence.find(e => e.includes('Landmark')).split("'")[1] : (status === 'resolved' ? 'N/A' : '— awaiting input');
-
   let chipColor = 'bg-slate-700 text-slate-300';
-  if (status === 'resolved') {
-    if (result.confidence === 'High') chipColor = 'bg-signal-high text-white';
-    if (result.confidence === 'Medium') chipColor = 'bg-signal-med text-navy-950';
-    if (result.confidence === 'Low') chipColor = 'bg-signal-low text-white';
+  if (status === 'resolved' && result) {
+    if (result.confidence === 'HIGH') chipColor = 'bg-signal-high text-white';
+    if (result.confidence === 'MEDIUM') chipColor = 'bg-signal-med text-navy-950';
+    if (result.confidence === 'LOW') chipColor = 'bg-signal-low text-white';
   }
 
-  // Geographic center of India
   const defaultCenter = [20.5937, 78.9629];
   const mapCenter = status === 'resolved' && result?.latitude ? [result.latitude, result.longitude] : defaultCenter;
-  const mapZoom = status === 'resolved' ? 16 : 5;
+  const mapZoom = status === 'resolved' ? 15 : 5;
+  
+  const mapBounds = status === 'resolved' && result?.candidates?.length > 0 
+    ? result.candidates.filter(c => c.lat && c.lon).map(c => [c.lat, c.lon]) 
+    : (result?.latitude ? [[result.latitude, result.longitude]] : null);
 
   return (
     <div className="h-full flex flex-col p-4 lg:p-6 text-slate-200 font-sans overflow-y-auto overflow-x-hidden relative z-10">
@@ -117,7 +123,7 @@ const HomePage = () => {
             <input
               type="text"
               className="w-full bg-cyber-900/80 backdrop-blur-md border-2 border-electric-glow/30 border-r-0 text-white px-6 py-4 rounded-l-xl focus:outline-none focus:border-electric-glow focus:shadow-[inset_0_0_20px_rgba(0,240,255,0.2)] transition-all text-lg font-mono placeholder:text-slate-500"
-              placeholder="Enter complex Indian address (e.g. opp. sbi bank, mg road...)"
+              placeholder="Enter complex Indian address..."
               value={address}
               onChange={(e) => setAddress(e.target.value)}
               disabled={status === 'resolving'}
@@ -147,57 +153,16 @@ const HomePage = () => {
       {status === 'conflict' && conflictData ? (
         <div className="flex-1 flex items-center justify-center p-4">
           <div className="bg-navy-900 border-2 border-signal-low rounded-lg p-6 lg:p-8 max-w-2xl w-full shadow-2xl">
-            <div className="flex items-center gap-3 mb-6 text-signal-low">
-              <div className="w-10 h-10 rounded-full bg-signal-low/20 flex items-center justify-center">
-                <span className="text-xl font-bold">⚠</span>
-              </div>
-              <h2 className="text-2xl font-bold uppercase tracking-wide">Address Conflict Detected</h2>
-            </div>
-            
-            <p className="text-slate-300 mb-6 leading-relaxed">
-              The coordinates you provided point to a different location than the text address. The system requires your input to resolve this conflict.
-            </p>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-              <div className="bg-navy-950 p-4 rounded border border-slate-800">
-                <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Text Address</h4>
-                <p className="text-sm text-slate-200">{conflictData.textAddress}</p>
-              </div>
-              <div className="bg-navy-950 p-4 rounded border border-slate-800">
-                <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Coordinates point to</h4>
-                <p className="text-sm text-slate-200 mb-1">{conflictData.reverseAddress}</p>
-                <p className="text-xs text-electric font-mono">{conflictData.coordinates}</p>
-              </div>
-            </div>
-            
-            <div className="bg-signal-low/10 border border-signal-low/30 p-4 rounded mb-8">
-               <span className="text-signal-low font-semibold text-sm">Reason: </span>
-               <span className="text-slate-300 text-sm">{conflictData.reason}</span>
-            </div>
-            
-            <div className="flex flex-col sm:flex-row gap-4">
-              <button 
-                onClick={() => handleLocate(null, 'coordinates')}
-                className="flex-1 bg-navy-800 hover:bg-navy-700 border border-slate-600 text-white px-4 py-3 rounded font-semibold transition-colors"
-              >
-                Use User Coordinates
-              </button>
-              <button 
-                onClick={() => handleLocate(null, 'text')}
-                className="flex-1 bg-electric hover:bg-blue-600 text-white px-4 py-3 rounded font-semibold transition-colors"
-              >
-                Use Text Address Search
-              </button>
-            </div>
+             <p>Conflict Detected...</p>
+             <button onClick={() => setStatus('idle')} className="mt-4 p-2 bg-slate-700">Go back</button>
           </div>
         </div>
       ) : (
       <div className="flex flex-col lg:grid lg:grid-cols-12 gap-4 lg:gap-6 flex-1 min-h-0">
         
-        {/* COLUMN 1: LEFT PANEL (Address Breakdown) */}
+        {/* COLUMN 1: LEFT PANEL (Parsed Fields & Final Result) */}
         <div className="order-3 lg:order-1 lg:col-span-3 flex flex-col space-y-4 lg:space-y-6 overflow-y-auto pr-1">
           
-          {/* Raw Address */}
           <div className="bg-navy-900 rounded-lg p-4 shadow-panel border border-slate-800">
             <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Original Input</h3>
             <p className={clsx("text-sm font-medium leading-relaxed font-mono", status === 'idle' ? 'text-slate-600' : 'text-slate-200')}>
@@ -205,86 +170,109 @@ const HomePage = () => {
             </p>
           </div>
 
-          {/* Parsed Fields */}
           <div className="bg-navy-900 rounded-lg p-4 shadow-panel border border-slate-800 flex-1 flex flex-col">
             <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-4">Parsed Fields (Agent 1)</h3>
-            
-            <div className="space-y-5 flex-1">
-              {/* Field Row */}
-              <div className="flex items-center justify-between">
-                <div className="flex flex-col">
-                  <span className="text-xs text-slate-400">Landmark</span>
-                  <span className={clsx("text-sm font-medium", status === 'resolved' ? 'text-slate-200' : 'text-slate-600')}>{extractedLandmark}</span>
-                </div>
-                <div className="w-16 h-1.5 bg-slate-800 rounded-full overflow-hidden">
-                   <div className={clsx("h-full w-full transition-all duration-1000", status === 'resolved' ? 'bg-signal-high' : 'bg-transparent -translate-x-full')}></div>
-                </div>
-              </div>
-              
-              <div className="flex items-center justify-between">
-                <div className="flex flex-col">
-                  <span className="text-xs text-slate-400">Pincode</span>
-                  <span className={clsx("text-sm font-medium font-mono", status === 'resolved' ? 'text-slate-200' : 'text-slate-600')}>{extractedPincode}</span>
-                </div>
-                <div className="w-16 h-1.5 bg-slate-800 rounded-full overflow-hidden">
-                   <div className={clsx("h-full w-full transition-all duration-1000", status === 'resolved' ? 'bg-signal-high' : 'bg-transparent -translate-x-full')}></div>
-                </div>
-              </div>
+            <div className="space-y-3 flex-1 overflow-y-auto max-h-[300px] pr-2 custom-scrollbar">
+              {['landmark', 'relation', 'locality', 'city', 'district', 'state', 'pincode', 'street', 'house_number', 'language'].map(field => (
+                 <div key={field} className="flex justify-between items-center border-b border-slate-800/50 pb-2">
+                    <span className="text-xs text-slate-400 capitalize">{field.replace('_', ' ')}</span>
+                    <span className={clsx("text-xs font-semibold", status === 'resolved' && result?.parsedEntities?.[field] ? 'text-electric-glow' : 'text-slate-600')}>
+                       {status === 'resolved' ? (result?.parsedEntities?.[field] || 'null') : '—'}
+                    </span>
+                 </div>
+              ))}
             </div>
           </div>
 
-          {/* Location Source Card */}
-          <div className="bg-navy-900 rounded-lg p-4 shadow-panel border border-slate-800 flex flex-col justify-between">
-             <div className="flex flex-col">
-                <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Location Source</h3>
-                <span className={clsx("text-xs font-semibold uppercase tracking-wider", status === 'resolved' ? 'text-signal-high' : 'text-slate-600')}>
-                   {status === 'resolved' ? result?.locationSource || 'Unknown' : 'Standby'}
-                </span>
-                <span className={clsx("text-xs mt-2 leading-relaxed", status === 'resolved' ? 'text-slate-300' : 'text-slate-600')}>
-                   {status === 'resolved' ? result?.explanation || 'Waiting for AI processing...' : '—'}
-                </span>
+          <div className="bg-navy-900 rounded-lg p-4 shadow-panel border border-slate-800 flex flex-col">
+             <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Final Geocoded Result</h3>
+             <div className="text-sm font-medium text-white mb-2">{status === 'resolved' ? result?.normalizedAddress : '—'}</div>
+             <div className="flex gap-4 text-xs font-mono text-slate-400 mb-4">
+                <span>Lat: {status === 'resolved' && result?.latitude ? result.latitude.toFixed(5) : '—'}</span>
+                <span>Lon: {status === 'resolved' && result?.longitude ? result.longitude.toFixed(5) : '—'}</span>
              </div>
+             
+             {status === 'resolved' && (
+               <button 
+                 onClick={() => setShowEvidence(true)}
+                 className="w-full bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs py-2 rounded-md transition-colors border border-slate-700 font-semibold flex items-center justify-center gap-2"
+               >
+                 <CheckCircle2 className="w-4 h-4 text-signal-high" /> View Evidence Audit
+               </button>
+             )}
           </div>
-
         </div>
 
-        {/* COLUMN 2: CENTER PANEL (Live Map) */}
-        <div className="order-1 lg:order-2 lg:col-span-6 relative rounded-lg overflow-hidden shadow-panel border border-slate-800 h-[400px] lg:h-auto">
-          {/* Map Overlay Chip */}
-          <div className="absolute top-4 left-4 z-[1000]">
-            <div className={clsx("px-3 py-1.5 rounded text-xs font-bold uppercase tracking-wider shadow-lg flex items-center gap-2 transition-colors", chipColor)}>
-               <div className={clsx("w-1.5 h-1.5 rounded-full bg-current", status === 'idle' ? '' : 'opacity-70')}></div>
-               {status === 'resolved' ? `${result.confidence} Confidence` : 'Awaiting Data'}
+        {/* COLUMN 2: CENTER PANEL (Live Map & Candidates) */}
+        <div className="order-1 lg:order-2 lg:col-span-6 flex flex-col gap-4 min-h-[500px]">
+          <div className="relative rounded-lg overflow-hidden shadow-panel border border-slate-800 flex-1 min-h-[300px]">
+            <div className="absolute top-4 left-4 z-[1000]">
+              <div className={clsx("px-3 py-1.5 rounded text-xs font-bold uppercase tracking-wider shadow-lg flex items-center gap-2 transition-colors", chipColor)}>
+                 <div className={clsx("w-1.5 h-1.5 rounded-full bg-current", status === 'idle' ? '' : 'opacity-70')}></div>
+                 {status === 'resolved' ? `${result.confidence} Confidence` : 'Awaiting Data'}
+              </div>
             </div>
+            
+            <MapContainer center={mapCenter} zoom={mapZoom} className="w-full h-full z-0" zoomControl={false}>
+              <MapController center={mapCenter} zoom={mapZoom} bounds={mapBounds} />
+              <TileLayer
+                className="map-tiles-dark"
+                attribution='&copy; OSM'
+                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              />
+              <ZoomControl position="bottomleft" />
+              
+              {status === 'resolved' && result && (
+                 <Marker position={[result.latitude, result.longitude]} zIndexOffset={1000}>
+                   <Popup className="text-navy-950 font-medium text-xs">Selected: {result.normalizedAddress}</Popup>
+                 </Marker>
+              )}
+
+              {status === 'resolved' && result?.candidates?.map((cand, idx) => (
+                 (cand.lat !== result.latitude || cand.lon !== result.longitude) ? (
+                   <Marker key={idx} position={[cand.lat, cand.lon]} icon={candidateIcon}>
+                     <Popup className="text-navy-950 font-medium text-xs">
+                       Candidate: {cand.name} <br/> Score: {cand.total_score}
+                     </Popup>
+                   </Marker>
+                 ) : null
+              ))}
+            </MapContainer>
+            
+            <style dangerouslySetInnerHTML={{__html: `
+              .map-tiles-dark { filter: brightness(0.6) invert(1) contrast(3) hue-rotate(200deg) saturate(0.3) brightness(0.7); }
+              .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+              .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+              .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+            `}} />
           </div>
-          
-          <MapContainer 
-            center={mapCenter} 
-            zoom={mapZoom} 
-            className="w-full h-full z-0"
-            zoomControl={false}
-          >
-            <MapController center={mapCenter} zoom={mapZoom} />
-            <TileLayer
-              className="map-tiles-dark"
-              attribution='&copy; OSM'
-              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-            />
-            <ZoomControl position="bottomleft" />
-            {status === 'resolved' && result && (
-               <Marker position={[result.latitude, result.longitude]}>
-                 <Popup className="text-navy-950 font-medium text-xs">
-                   {result.normalizedAddress}
-                 </Popup>
-               </Marker>
-            )}
-          </MapContainer>
-          
-          <style dangerouslySetInnerHTML={{__html: `
-            .map-tiles-dark {
-              filter: brightness(0.6) invert(1) contrast(3) hue-rotate(200deg) saturate(0.3) brightness(0.7);
-            }
-          `}} />
+
+          {/* Candidates List Below Map */}
+          {status === 'resolved' && result?.candidates?.length > 0 && (
+            <div className="bg-navy-900 rounded-lg p-4 shadow-panel border border-slate-800 h-48 overflow-y-auto custom-scrollbar">
+              <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-3 sticky top-0 bg-navy-900 pb-2 z-10">Candidate Locations Scored (Agent 4)</h3>
+              <div className="space-y-2">
+                {result.candidates.map((cand, idx) => {
+                  const isSelected = cand.lat === result.latitude && cand.lon === result.longitude;
+                  return (
+                    <div key={idx} className={clsx("flex items-center justify-between p-3 rounded-lg border", isSelected ? "bg-electric-glow/10 border-electric-glow/50" : "bg-navy-950 border-slate-800")}>
+                      <div className="flex items-center gap-3 overflow-hidden">
+                        <MapPin className={clsx("w-5 h-5 flex-shrink-0", isSelected ? "text-electric-glow" : "text-slate-500")} />
+                        <div className="flex flex-col truncate">
+                          <span className={clsx("text-sm font-semibold truncate", isSelected ? "text-electric-glow" : "text-slate-300")}>{cand.name}</span>
+                          <span className="text-xs text-slate-500">{cand.source} • {Math.round(cand.distance_from_ref || 0)}m from Pincode Centroid</span>
+                        </div>
+                      </div>
+                      <div className="flex flex-col items-end ml-4">
+                        <span className={clsx("text-lg font-bold font-mono", isSelected ? "text-signal-high" : "text-slate-400")}>{cand.total_score}</span>
+                        <span className="text-[9px] uppercase text-slate-500">Score</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* COLUMN 3: RIGHT PANEL (Agent Feed) */}
@@ -294,8 +282,12 @@ const HomePage = () => {
 
       </div>
       )}
+
+      {showEvidence && status === 'resolved' && result && (
+        <EvidenceModal result={result} onClose={() => setShowEvidence(false)} />
+      )}
     </div>
   );
 };
 
-export default HomePage;
+export default LocateAddress;

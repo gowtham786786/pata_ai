@@ -187,7 +187,9 @@ const locateAddress = async (req, res, next) => {
             success: true,
             source: 'ai_service',
             data: addressData,
-            addressId: addressDocRef.id
+            addressId: addressDocRef.id,
+            candidates: aiResponse.candidates || [],
+            parsedEntities: aiResponse.parsedEntities || {}
         });
 
     } catch (error) {

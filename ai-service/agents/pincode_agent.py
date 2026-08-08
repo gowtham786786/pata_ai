@@ -1,56 +1,57 @@
-from utils.pincode_loader import get_pincode_info, get_city_info
+from utils.pincode_loader import get_pincode_info
 from typing import Dict, Any, Tuple
 from thefuzz import fuzz
 
 class PincodeVerificationAgent:
     """
-    Agent 3: Pincode Validation
-    Validates the pincode against the official dataset to confirm District and State.
-    Never uses or returns CSV latitude/longitude as final coordinates.
+    Agent 2: Pincode Verifier
+    Check pincode existence, state/city consistency, and returns reference area.
     """
     
-    def verify(self, pincode: str, parsed_district: str = None, parsed_state: str = None) -> Tuple[bool, Dict[str, Any], str]:
-        """
-        Returns (is_valid, validation_data, evidence_string)
-        """
+    def verify(self, pincode: str, parsed_city: str = None, parsed_state: str = None) -> Tuple[bool, Dict[str, Any], str]:
         if not pincode:
-            return False, {}, "No pincode provided for validation."
+            return False, {
+                "pincode": None, "valid": False, "state_match": False, "city_match": False,
+                "reference_latitude": None, "reference_longitude": None, "issues": ["No pincode provided"]
+            }, "No pincode provided for validation."
             
         data = get_pincode_info(pincode)
         if not data:
-            return False, {}, f"Pincode {pincode} not found in database or invalid."
+            return False, {
+                "pincode": pincode, "valid": False, "state_match": False, "city_match": False,
+                "reference_latitude": None, "reference_longitude": None, "issues": ["Pincode not found in dataset"]
+            }, f"Pincode {pincode} not found in database or invalid."
             
-        dataset_district_raw = str(data.get('district') or '').lower()
-        dataset_state_raw = str(data.get('state') or '').lower()
+        dataset_district = str(data.get('district') or '').lower()
+        dataset_state = str(data.get('state') or '').lower()
         
-        dataset_district = "" if dataset_district_raw == "nan" else dataset_district_raw
-        dataset_state = "" if dataset_state_raw == "nan" else dataset_state_raw
-        
-        validation_data = {
-            "pincode": pincode,
-            "district": dataset_district.title() if dataset_district else "",
-            "state": dataset_state.title() if dataset_state else "",
-            "district_match": False,
-            "state_match": False,
-            "lat": data.get('lat'),
-            "lon": data.get('lon')
-        }
-        
-        evidence = f"Pincode {pincode} exists in {dataset_district.title()}, {dataset_state.title()}."
+        issues = []
+        state_match = False
+        city_match = False
         
         if parsed_state and parsed_state.lower() in dataset_state:
-             validation_data["state_match"] = True
-             evidence += " State matches."
+            state_match = True
+        elif parsed_state:
+            issues.append("Input state differs from verified pincode state.")
              
-        if parsed_district and parsed_district.lower() in dataset_district:
-             validation_data["district_match"] = True
-             evidence += " District matches."
-             
-        # If district doesn't perfectly match, check fuzzy similarity
-        if parsed_district and not validation_data["district_match"]:
-            if fuzz.partial_ratio(parsed_district.lower(), dataset_district) > 75:
-                validation_data["district_match"] = True
-                evidence += " District fuzzy matches."
-
-        # Do NOT return the lat/lon from the dataset here to prevent centroid geocoding.
+        if parsed_city:
+            if fuzz.partial_ratio(parsed_city.lower(), dataset_district) > 75 or fuzz.partial_ratio(parsed_city.lower(), str(data.get('place_name') or '').lower()) > 75:
+                city_match = True
+            else:
+                issues.append("Input pincode differs from verified locality/city.")
+                
+        validation_data = {
+            "pincode": pincode,
+            "valid": True,
+            "state_match": state_match,
+            "city_match": city_match,
+            "reference_latitude": str(data.get('lat', '')),
+            "reference_longitude": str(data.get('lon', '')),
+            "issues": issues
+        }
+        
+        evidence = f"Pincode {pincode} verified."
+        if issues:
+            evidence += " " + " ".join(issues)
+            
         return True, validation_data, evidence

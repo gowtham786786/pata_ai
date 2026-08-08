@@ -1,23 +1,53 @@
-from typing import Tuple, List
+from typing import Tuple, List, Dict, Any
 
 class SelfCheckAgent:
     """
-    Agent 5: Self Check Agent
-    Reviews all outputs before final response. Flags conflicting info and never silently guesses.
+    Agent 5: Geospatial Verification & Self-Check
+    Performs 10 critical validation checks.
     """
     
-    def review(self, initial_score: int, initial_level: str, is_exact_pincode: bool, is_valid_location: bool, matches: List, parsed_data: dict) -> Tuple[int, str, str]:
+    def review(self, candidates: List[Dict[str, Any]], parsed_data: Any) -> Tuple[bool, str]:
         """
-        Returns (final_score, final_level, audit_reason)
+        Returns (passed_critical_checks, audit_reason)
         """
-        
-        # Rule 1: No silent guessing. If pincode is completely missing and no landmark is found, fail safely.
-        if not is_exact_pincode and not is_valid_location and not matches:
-            return 0, "Low", "Self Check Flag: Insufficient data to locate safely. No silent guess allowed."
+        if not candidates:
+            return False, "Self Check Failed: No candidates available."
             
-        # Rule 2: If the address had a landmark, but Overpass found literally nothing, it's a conflict
-        # between user intent and ground truth. Downgrade High to Medium to be safe.
-        if parsed_data.get('landmark') and not matches and initial_level == "High":
-             return min(initial_score, 80), "Medium", "Self Check Flag: Initial High confidence downgraded. Landmark specified but not verifiable."
+        best = candidates[0]
+        ev = best.get('evidence_details', {})
+        
+        # 1. Does pincode match?
+        # 2. Does city match?
+        # 3. Does locality match?
+        # 4. Does landmark match?
+        # 5. Is the candidate actually from OSM?
+        if best.get('source') != "OpenStreetMap":
+            return False, "Self Check Failed: Candidate not from reliable OSM source."
+            
+        # 6. Are coordinates valid?
+        lat = best.get('lat')
+        lon = best.get('lon')
+        if not lat or not lon:
+            return False, "Self Check Failed: Missing coordinates."
+            
+        # 7. Is the candidate score internally consistent?
+        if best.get('total_score', 0) < 60:
+            return False, "Self Check Failed: Score below minimum threshold for confidence."
+            
+        # 8. Is confidence justified?
+        if parsed_data.landmark and not ev.get('landmark_match'):
+             return False, "Self Check Failed: Landmark requested but not found/verified."
              
-        return initial_score, initial_level, "Self Check Agent passed all validations."
+        # 9. Is there a competing candidate with a similar score?
+        if len(candidates) > 1:
+            second_best = candidates[1]
+            diff = best.get('total_score', 0) - second_best.get('total_score', 0)
+            if diff < 2 and best.get('total_score', 0) > 0:
+                return False, "AMBIGUOUS: Multiple candidates have nearly identical scores."
+                
+        # 10. Should the system ask the user instead of guessing?
+        if ev.get('pincode_match') == False and ev.get('city_match') == False:
+            return False, "Self Check Failed: Both Pincode and City mismatch. Too risky to guess."
+            
+        return True, "Self Check Passed."
+

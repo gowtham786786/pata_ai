@@ -6,24 +6,19 @@ class GeocodeRequest(BaseModel):
     force_source: Optional[str] = Field(None, description="Force source: 'coordinates' or 'text'")
 
 class ExtractedEntities(BaseModel):
-    # Added explicit coordinates
-    latitude: Optional[float] = None
-    longitude: Optional[float] = None
-    
-    house_no: Optional[str] = None
-    building: Optional[str] = None
-    road: Optional[str] = None
+    raw_address: Optional[str] = None
     landmark: Optional[str] = None
-    nearby_place: Optional[str] = None
-    area: Optional[str] = None
+    relation: Optional[str] = None
     locality: Optional[str] = None
-    village: Optional[str] = None
-    town: Optional[str] = None
-    taluk: Optional[str] = None
     city: Optional[str] = None
     district: Optional[str] = None
     state: Optional[str] = None
     pincode: Optional[str] = None
+    street: Optional[str] = None
+    house_number: Optional[str] = None
+    language: Optional[str] = "English"
+    transliterated: Optional[bool] = False
+    confidence: Optional[float] = 0.0
 
 class LandmarkEvidence(BaseModel):
     name: str
