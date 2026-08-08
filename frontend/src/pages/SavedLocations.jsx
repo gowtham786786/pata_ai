@@ -20,7 +20,11 @@ const SavedLocations = () => {
             <p className="text-sm text-slate-500 font-mono mb-6">Star a location from the Locate or History tabs to save it here for quick access.</p>
             <div className="w-full h-64 bg-navy-950 border border-slate-800 rounded-lg overflow-hidden opacity-50 pointer-events-none">
               <MapContainer center={[20.5937, 78.9629]} zoom={4} style={{ height: '100%', width: '100%', backgroundColor: '#020617' }}>
-                 <TileLayer url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" />
+                 <TileLayer
+                  className="map-tiles-dark"
+                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                  attribution='&copy; OSM'
+                />
               </MapContainer>
             </div>
          </div>

@@ -148,9 +148,10 @@ const AdminDashboard = () => {
           </h2>
           <div className="flex-1 bg-navy-900 border border-slate-800 rounded-lg shadow-panel overflow-hidden relative z-0">
              <MapContainer center={[20.5937, 78.9629]} zoom={4} style={{ height: '100%', width: '100%', backgroundColor: '#020617' }}>
-                <TileLayer 
-                   url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-                   attribution='&copy; <a href="https://carto.com/">CARTO</a>'
+                <TileLayer
+                  className="map-tiles-dark"
+                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                  attribution='&copy; OSM'
                 />
                 {logs.map((log, idx) => {
                   if (log.latitude && log.longitude) {

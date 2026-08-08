@@ -7,7 +7,7 @@ import LocateAddress from './pages/LocateAddress';
 import HistoryPage from './pages/HistoryPage';
 import SavedLocations from './pages/SavedLocations';
 import RoutePlanner from './pages/RoutePlanner';
-import NearbyExplorer from './pages/NearbyExplorer';
+
 import UserReports from './pages/UserReports';
 import UserProfile from './pages/UserProfile';
 import AdminDashboard from './pages/AdminDashboard';
@@ -55,7 +55,7 @@ function App() {
             <Route path="history" element={<HistoryPage />} />
             <Route path="saved" element={<SavedLocations />} />
             <Route path="route" element={<RoutePlanner />} />
-            <Route path="nearby" element={<NearbyExplorer />} />
+
             <Route path="reports" element={<UserReports />} />
             <Route path="profile" element={<UserProfile />} />
             <Route path="settings" element={<SettingsPage />} />

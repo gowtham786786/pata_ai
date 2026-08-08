@@ -1,18 +1,19 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import { LayoutDashboard, MapPin, History, Bookmark, Map, Route, BarChart2, Settings, User, LogOut, TerminalSquare } from 'lucide-react';
 import clsx from 'clsx';
 import { useAuth } from '../../context/AuthContext';
 
 const UserSidebar = () => {
-  const { logout } = useAuth();
+  const { logout, currentUser } = useAuth();
+  const [showUserMenu, setShowUserMenu] = useState(false);
   
   const navItems = [
     { to: '/user', icon: <LayoutDashboard size={18} />, label: 'Dashboard' },
     { to: '/user/locate', icon: <MapPin size={18} />, label: 'Locate Address' },
     { to: '/user/history', icon: <History size={18} />, label: 'Search History' },
     { to: '/user/saved', icon: <Bookmark size={18} />, label: 'Saved Locations' },
-    { to: '/user/nearby', icon: <Map size={18} />, label: 'Nearby Places' },
+
     { to: '/user/route', icon: <Route size={18} />, label: 'Route Planner' },
     { to: '/user/reports', icon: <BarChart2 size={18} />, label: 'My Reports' },
   ];
@@ -50,18 +51,46 @@ const UserSidebar = () => {
         ))}
       </nav>
 
-      <div className="p-4 border-t border-white/5 space-y-2 bg-cyber-900/30">
-        <NavLink to="/user/profile" className={({ isActive }) => clsx("flex items-center space-x-3 px-4 py-3 w-full text-left rounded-xl transition-all duration-300 font-mono text-sm uppercase tracking-wider border border-transparent", isActive ? "bg-white/10 text-white border-white/10" : "text-slate-400 hover:bg-white/5")}>
-          <User size={18} />
-          <span>Profile</span>
-        </NavLink>
-        <NavLink to="/user/settings" className={({ isActive }) => clsx("flex items-center space-x-3 px-4 py-3 w-full text-left rounded-xl transition-all duration-300 font-mono text-sm uppercase tracking-wider border border-transparent", isActive ? "bg-white/10 text-white border-white/10" : "text-slate-400 hover:bg-white/5")}>
-          <Settings size={18} />
-          <span>Settings</span>
-        </NavLink>
-        <button onClick={logout} className="flex items-center space-x-3 px-4 py-3 w-full text-left text-slate-400 hover:bg-signal-low/10 hover:text-signal-low hover:border-signal-low/30 border border-transparent rounded-xl transition-all duration-300 font-mono text-sm uppercase tracking-wider">
-          <LogOut size={18} />
-          <span>Logout</span>
+      <div className="relative p-4 border-t border-white/5 bg-cyber-900/30">
+        {showUserMenu && (
+          <div className="absolute bottom-full left-4 mb-2 w-56 bg-navy-950 border border-slate-700/50 rounded-xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom-2 fade-in duration-200 z-50">
+            <div className="px-4 py-3 border-b border-slate-800/50">
+              <p className="text-sm font-semibold text-white truncate">{currentUser?.displayName || 'User'}</p>
+              <p className="text-xs text-slate-400 truncate">{currentUser?.email || 'user@example.com'}</p>
+            </div>
+            <div className="p-1">
+              <NavLink to="/user/profile" onClick={() => setShowUserMenu(false)} className="flex items-center space-x-3 px-3 py-2 text-sm text-slate-300 hover:text-white hover:bg-white/5 rounded-lg transition-colors">
+                <User size={16} />
+                <span>Profile</span>
+              </NavLink>
+              <NavLink to="/user/settings" onClick={() => setShowUserMenu(false)} className="flex items-center space-x-3 px-3 py-2 text-sm text-slate-300 hover:text-white hover:bg-white/5 rounded-lg transition-colors">
+                <Settings size={16} />
+                <span>Settings</span>
+              </NavLink>
+            </div>
+            <div className="p-1 border-t border-slate-800/50">
+              <button onClick={() => { setShowUserMenu(false); logout(); }} className="flex items-center space-x-3 px-3 py-2 w-full text-left text-red-400 hover:text-red-300 hover:bg-red-400/10 rounded-lg transition-colors text-sm">
+                <LogOut size={16} />
+                <span>Log out</span>
+              </button>
+            </div>
+          </div>
+        )}
+        
+        <button 
+          onClick={() => setShowUserMenu(!showUserMenu)}
+          className={clsx(
+            "flex items-center space-x-3 w-full p-2 rounded-xl transition-all duration-300 border border-transparent",
+            showUserMenu ? "bg-white/10 border-white/10" : "hover:bg-white/5"
+          )}
+        >
+          <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-electric-600 to-electric-glow flex items-center justify-center text-navy-950 font-bold text-sm uppercase shadow-glow-cyan shrink-0">
+            {currentUser?.displayName ? currentUser.displayName.charAt(0) : currentUser?.email ? currentUser.email.charAt(0) : 'U'}
+          </div>
+          <div className="flex-1 min-w-0 text-left">
+            <p className="text-sm font-semibold text-white truncate">{currentUser?.displayName || 'User'}</p>
+            <p className="text-xs text-slate-400 truncate">{currentUser?.email || 'user@example.com'}</p>
+          </div>
         </button>
       </div>
     </div>
