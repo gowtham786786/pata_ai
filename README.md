@@ -135,7 +135,30 @@ PataAI/
 
 ---
 
-## ⚙️ Project Workflow
+## ⚙️ Automation Workflow
+
+Below is the complete automation workflow showing the flow from incoming requests through caching, AI agents, verification, analysis, response generation, and final data updates.
+
+<p align="center">
+  <img src="assets/images/automation-workflow-3d.png"
+       alt="3D Automation Workflow Architecture"
+       width="100%">
+</p>
+<p align="center">
+  <b>3D Automation Workflow Architecture</b>
+</p>
+
+### Workflow Flow
+
+1. **Request Intake** → Receives the incoming request.
+2. **Normalization & Search History** → Processes the request and records search information.
+3. **Cache Validation** → Checks whether a previous result is available.
+4. **AI Agent Processing** → Multiple AI agents parse, clean, verify, enrich, and analyze information.
+5. **Result Composition** → Combines the processed information into a structured response.
+6. **Analytics & Cache Update** → Stores useful results and analytics.
+7. **Final Response** → Returns the processed response to the user.
+
+<br/>
 
 ```mermaid
 sequenceDiagram
