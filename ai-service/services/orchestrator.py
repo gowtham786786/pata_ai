@@ -61,7 +61,7 @@ async def run_agent_workflow(raw_address: str, force_source: Optional[str] = Non
     log_step(3, "Agent 3: OSM Landmark Finder", t3, f"Found {len(candidates)} candidate landmarks", geo_ev, "success" if candidates else "warning")
     
     if not candidates:
-        return build_fallback_response(raw_address, parsed, agent_steps, evidence_log, "No candidates found via Overpass OSM.")
+        return build_fallback_response(raw_address, parsed, agent_steps, evidence_log, "No candidates found via Overpass OSM.", float(ref_lat), float(ref_lon))
 
     # --- Agent 4: Candidate Ranker / Scoring Engine ---
     t4 = time.perf_counter()
@@ -104,20 +104,32 @@ async def run_agent_workflow(raw_address: str, force_source: Optional[str] = Non
         "candidates": candidates
     }
 
-def build_fallback_response(raw_address: str, parsed, agent_steps, evidence_log, reason: str):
+def build_fallback_response(raw_address: str, parsed, agent_steps, evidence_log, reason: str, ref_lat: float = None, ref_lon: float = None):
     return {
         "status": "success",
         "originalAddress": raw_address,
-        "normalizedAddress": "Unable to safely geocode",
-        "latitude": None,
-        "longitude": None,
-        "locationSource": "Unknown",
-        "explanation": f"LOW CONFIDENCE / REVIEW REQUIRED: {reason}",
+        "normalizedAddress": "Approximate Location (Pincode Centroid)" if ref_lat else "Unable to safely geocode",
+        "latitude": ref_lat,
+        "longitude": ref_lon,
+        "locationSource": "Pincode Centroid" if ref_lat else "Unknown",
+        "explanation": f"LOW CONFIDENCE / REVIEW REQUIRED: {reason} Showing approximate location based on Pincode." if ref_lat else f"LOW CONFIDENCE / REVIEW REQUIRED: {reason}",
         "confidence": "LOW",
-        "confidenceScore": 0,
+        "confidenceScore": 30 if ref_lat else 0,
         "evidence": evidence_log,
         "agentSteps": agent_steps,
-        "nearbyLandmarks": [],
+        "nearbyLandmarks": [{
+            "name": "Pincode Centroid (Fallback)",
+            "distance_from_ref": 0,
+            "type": "node"
+        }] if ref_lat else [],
         "parsedEntities": parsed.model_dump(),
-        "candidates": []
+        "candidates": [{
+            "name": "Pincode Centroid (Fallback)",
+            "lat": ref_lat,
+            "lon": ref_lon,
+            "distance_from_ref": 0,
+            "source": "Pincode Centroid",
+            "type": "node",
+            "total_score": 30
+        }] if ref_lat else []
     }

@@ -58,6 +58,7 @@ const AgentFeed = ({ status, result }) => {
       if (index === activeStep) return { ...agent, result: 'Processing...', detail: 'Connecting...', time: '--', status: 'processing' };
       // Previous steps are complete
       const resolvedData = result.agentSteps[index];
+      if (!resolvedData) return { ...agent, result: 'Skipped', detail: '', time: '--', status: 'idle' };
       return { ...agent, result: resolvedData.result, detail: resolvedData.detail, time: `${resolvedData.timeMs}ms`, status: resolvedData.status };
     }
     

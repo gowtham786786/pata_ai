@@ -222,21 +222,22 @@ const LocateAddress = () => {
               />
               <ZoomControl position="bottomleft" />
               
-              {status === 'resolved' && result && (
+              {status === 'resolved' && result && result.latitude != null && result.longitude != null && (
                  <Marker position={[result.latitude, result.longitude]} zIndexOffset={1000}>
                    <Popup className="text-navy-950 font-medium text-xs">Selected: {result.normalizedAddress}</Popup>
                  </Marker>
               )}
 
-              {status === 'resolved' && result?.candidates?.map((cand, idx) => (
-                 (cand.lat !== result.latitude || cand.lon !== result.longitude) ? (
+              {status === 'resolved' && result?.candidates?.map((cand, idx) => {
+                 if (!cand || cand.lat == null || cand.lon == null) return null;
+                 return (cand.lat !== result.latitude || cand.lon !== result.longitude) ? (
                    <Marker key={idx} position={[cand.lat, cand.lon]} icon={candidateIcon}>
                      <Popup className="text-navy-950 font-medium text-xs">
                        Candidate: {cand.name} <br/> Score: {cand.total_score}
                      </Popup>
                    </Marker>
                  ) : null
-              ))}
+              })}
             </MapContainer>
             
             <style dangerouslySetInnerHTML={{__html: `
