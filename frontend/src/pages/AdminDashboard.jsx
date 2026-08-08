@@ -2,10 +2,21 @@ import React, { useEffect, useState } from 'react';
 import { LayoutDashboard, Activity, CheckCircle, AlertTriangle, ListFilter, MapPin } from 'lucide-react';
 import { motion } from 'framer-motion';
 import ConfidenceRing from '../components/ConfidenceRing';
-import { MapContainer, TileLayer, CircleMarker, Popup } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import { getGeocodeLogs, getCorrections } from '../services/apiService';
 import { useAuth } from '../context/AuthContext';
+import L from 'leaflet';
+import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
+import markerIcon from 'leaflet/dist/images/marker-icon.png';
+import markerShadow from 'leaflet/dist/images/marker-shadow.png';
+
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconUrl: markerIcon,
+  iconRetinaUrl: markerIcon2x,
+  shadowUrl: markerShadow,
+});
 
 const AdminDashboard = () => {
   const { currentUser } = useAuth();
@@ -144,13 +155,9 @@ const AdminDashboard = () => {
                 {logs.map((log, idx) => {
                   if (log.latitude && log.longitude) {
                      return (
-                       <CircleMarker 
+                       <Marker 
                          key={log.id || idx}
-                         center={[log.latitude, log.longitude]}
-                         radius={log.confidence_level === 'Low' ? 8 : 4}
-                         fillOpacity={log.confidence_level === 'Low' ? 0.6 : 0.2}
-                         color="transparent"
-                         fillColor={getConfidenceColor(log.confidence_level)}
+                         position={[log.latitude, log.longitude]}
                        >
                          <Popup className="custom-popup bg-navy-950 border border-slate-800 text-slate-200">
                            <div className="text-xs">
@@ -159,7 +166,7 @@ const AdminDashboard = () => {
                              <div className="text-slate-500 mt-1">{new Date(log.timestamp).toLocaleString()}</div>
                            </div>
                          </Popup>
-                       </CircleMarker>
+                       </Marker>
                      )
                   }
                   return null;
