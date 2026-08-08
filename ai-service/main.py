@@ -43,7 +43,7 @@ async def geocode_address(request: GeocodeRequest):
     
     try:
         # Execute the 5-Agent workflow
-        final_result = await run_agent_workflow(request.address)
+        final_result = await run_agent_workflow(request.address, request.force_source)
         
         # Add processing time profiling
         final_result["processingTimeMs"] = int((time.time() - start_time) * 1000)
@@ -51,5 +51,7 @@ async def geocode_address(request: GeocodeRequest):
         return final_result
         
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         print(f"Error during geocoding: {str(e)}")
         raise HTTPException(status_code=500, detail="AI Processing Failed")

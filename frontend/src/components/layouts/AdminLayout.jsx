@@ -1,16 +1,16 @@
 import React from 'react';
 import { Outlet } from 'react-router-dom';
-import Sidebar from '../components/Sidebar';
+import AdminSidebar from './AdminSidebar';
 
-const MainLayout = () => {
+const AdminLayout = () => {
   return (
     <div className="flex h-screen overflow-hidden bg-transparent text-slate-100 font-sans">
-      <Sidebar />
-      <main className="flex-1 overflow-y-auto overflow-x-hidden">
+      <AdminSidebar />
+      <main className="flex-1 overflow-y-auto overflow-x-hidden relative">
         <Outlet />
       </main>
     </div>
   );
 };
 
-export default MainLayout;
+export default AdminLayout;

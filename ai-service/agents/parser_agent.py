@@ -4,31 +4,9 @@ from models.schemas import ExtractedEntities
 class AddressParserAgent:
     """
     Agent 1: Parses messy Indian addresses.
-    Handles Hinglish (opp, near, ke samne, pas) and extracts structured entities.
+    Extracts structured entities: State, District, Taluk, Village, Locality, Road, House No, Landmark, Pincode, Coordinates.
     """
     
-    HINGLISH_MAP = {
-        "samne": "opposite",
-        "saamne": "opposite",
-        "opp": "opposite",
-        "opp.": "opposite",
-        "pas": "near",
-        "paas": "near",
-        "piche": "behind",
-        "peeche": "behind",
-        "bagal me": "next to",
-        "bagal": "next to",
-        "ke paas": "near",
-        "ke samne": "opposite",
-        "gali": "street",
-        "marg": "road",
-        "bhavan": "building",
-        "nagar": "area",
-        "colony": "area",
-        "vihar": "area",
-        "gaon": "village"
-    }
-
     # Known Indian States for extraction
     INDIAN_STATES = [
         "andhra pradesh", "arunachal pradesh", "assam", "bihar", "chhattisgarh",
@@ -40,15 +18,25 @@ class AddressParserAgent:
     ]
 
     def parse(self, raw_address: str) -> ExtractedEntities:
-        # Clean address
-        address = raw_address.lower().strip()
-        address = re.sub(r'[^\w\s\.,-]', ' ', address)
-        
-        # Normalize Hinglish
-        for hin, eng in self.HINGLISH_MAP.items():
-            address = re.sub(rf'\b{hin}\b', eng, address)
-            
         entities = ExtractedEntities()
+        address = raw_address.lower().strip()
+        
+        # 0. Extract Coordinates
+        coord_match = re.search(r'([-+]?\d{1,2}\.\d+)\s*,\s*([-+]?\d{1,3}\.\d+)', address)
+        if coord_match:
+            lat_str, lon_str = coord_match.groups()
+            try:
+                lat = float(lat_str)
+                lon = float(lon_str)
+                if 6 <= lat <= 38 and 68 <= lon <= 98:
+                    entities.latitude = lat
+                    entities.longitude = lon
+                    address = address.replace(coord_match.group(0), '')
+            except ValueError:
+                pass
+                
+        # Clean address for regex matching
+        address = re.sub(r'[^\w\s\.,-]', ' ', address)
         
         # 1. Pincode
         pincode_match = re.search(r'\b\d{6}\b', address)
@@ -63,34 +51,46 @@ class AddressParserAgent:
                 address = address.replace(state, '')
                 break
                 
-        # 3. Landmark & Nearby Place
-        landmark_match = re.search(r'(?:near|opposite|behind|next to)\s+([a-z0-9\s]+?)(?:,|$)', address)
+        # 3. House No / Plot No
+        house_match = re.search(r'\b(?:house no|h no|plot no|flat no|door no|#|no\.?)\s*[:#-]?\s*([a-z0-9/-]+)\b', address)
+        if house_match:
+            entities.house_no = house_match.group(1).strip()
+            
+        # 4. Landmark
+        landmark_match = re.search(r'(?:near|opp\.?|opposite|behind|next to|saamne|piche|paas)\s+([a-z0-9\s]+?)(?:,|$)', address)
         if landmark_match:
             entities.landmark = landmark_match.group(1).strip()
-            # If the landmark is very long, it might contain the road or city, we'll keep it simple
             
-        fallback_match = re.search(r'\b([a-z\s]+(?:bank|mall|hospital|school|college|temple|mosque|church|station|gate|palace|tower))\b', address)
-        if fallback_match and not entities.landmark:
-            entities.landmark = fallback_match.group(1).strip()
-
-        # 4. Road / Street
+        # 5. Road
         road_match = re.search(r'\b([a-z0-9\s]+(?:road|rd|street|st|marg|highway))\b', address)
         if road_match:
             entities.road = road_match.group(1).strip()
             
-        # 5. Area / Locality (words ending in nagar, colony, vihar, enclave)
+        # 6. Area / Locality
         area_match = re.search(r'\b([a-z0-9\s]+(?:nagar|colony|vihar|enclave|layout|phase|block|sector\s\d+))\b', address)
         if area_match:
-            entities.area = area_match.group(1).strip()
+            entities.locality = area_match.group(1).strip()
 
-        # 6. City Extraction (heuristic: last remaining word before state/pincode, or known cities)
-        # For a robust implementation, the Pincode Verification Agent will fetch the exact city/district
-        # But we can try to extract explicit commas
+        # 7. Village
+        village_match = re.search(r'\b([a-z0-9\s]+(?:village|gaon|palli|halli|puram|pur|abad))\b', address)
+        if village_match:
+            entities.village = village_match.group(1).strip()
+            
+        # 8. Taluk / Mandal
+        taluk_match = re.search(r'\b([a-z0-9\s]+(?:mandal|taluka|taluk|tehsil))\b', address)
+        if taluk_match:
+            entities.taluk = taluk_match.group(1).strip()
+
+        # 9. District
+        district_match = re.search(r'\b([a-z0-9\s]+(?:district|dist))\b', address)
+        if district_match:
+            entities.district = district_match.group(1).replace('district', '').replace('dist', '').strip().title()
+
+        # 10. City fallback
         parts = [p.strip() for p in address.split(',') if p.strip()]
         if parts:
-            # Often the last or second to last part is the city
             potential_city = parts[-1]
             if len(potential_city) > 2 and not any(k in potential_city for k in ['near', 'opp', 'road']):
                 entities.city = potential_city.title()
-        
+                
         return entities

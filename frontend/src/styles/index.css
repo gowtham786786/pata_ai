@@ -4,11 +4,27 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer utilities {
+  .glass-panel {
+    @apply bg-cyber-800 bg-opacity-60 backdrop-blur-md border border-white/10 shadow-panel;
+  }
+  .glass-panel-heavy {
+    @apply bg-cyber-900 bg-opacity-80 backdrop-blur-xl border border-white/5 shadow-2xl;
+  }
+  .glass-panel-neon {
+    @apply bg-cyber-900 bg-opacity-60 backdrop-blur-lg border border-electric-glow/30 shadow-glow-cyan;
+  }
+  .text-glow {
+    text-shadow: 0 0 10px rgba(0, 240, 255, 0.6);
+  }
+}
+
 body {
-  background-color: #020617; /* navy-950 */
-  color: #f1f5f9; /* slate-100 */
+  background-color: #050B14; /* cyber-950 */
+  color: #f1f5f9; 
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
 }
 
 ::selection {
@@ -16,29 +32,29 @@ body {
   color: white;
 }
 
-/* Custom scrollbar for a modern look */
+/* Custom scrollbar for a cyber look */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: #020617; 
+  background: transparent; 
 }
 ::-webkit-scrollbar-thumb {
-  background: #1E293B; 
-  border-radius: 4px;
+  background: #112240; /* cyber-800 */
+  border-radius: 10px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #334155; 
+  background: #1D3B68; /* cyber-700 */
 }
 
-/* Leaflet specific overrides for dark mode */
+/* Leaflet overrides for dark cyber mode */
 .leaflet-container {
-  background: #0F172A !important;
+  background: #0A1428 !important; /* cyber-900 */
 }
 .leaflet-layer,
 .leaflet-control-zoom-in,
 .leaflet-control-zoom-out,
 .leaflet-control-attribution {
-  filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%);
+  filter: invert(100%) hue-rotate(180deg) brightness(85%) contrast(120%);
 }

@@ -17,16 +17,21 @@ const HistoryPage = () => {
     const historyRef = collection(db, 'search_history');
     const q = query(
       historyRef,
-      where('userId', '==', currentUser.uid),
-      orderBy('timestamp', 'desc'),
-      limit(50)
+      where('userId', '==', currentUser.uid)
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({
+      let data = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       }));
+      
+      // Sort in memory to avoid needing a composite index in Firestore
+      data.sort((a, b) => b.timestamp - a.timestamp);
+      
+      // Limit to 50 items
+      data = data.slice(0, 50);
+      
       setHistory(data);
       setLoading(false);
     }, (error) => {

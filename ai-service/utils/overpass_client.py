@@ -80,3 +80,49 @@ async def search_generic_pois(lat: float, lon: float, radius_meters: int = 1000)
     out center limit 10;
     """
     return await _execute_overpass_query(query, lat, lon)
+
+NOMINATIM_URL = "https://nominatim.openstreetmap.org/search"
+
+async def search_nominatim(query: str, state: str = "") -> List[Dict[str, Any]]:
+    """
+    Uses the OSM Nominatim API to find exact coordinates for a village, town, or road.
+    """
+    if not query:
+        return []
+        
+    full_query = f"{query}, {state}" if state else query
+    
+    headers = {
+        'User-Agent': 'PataAI-Location-Intelligence/1.0 (gowtham@example.com)'
+    }
+    
+    params = {
+        'q': full_query,
+        'format': 'json',
+        'addressdetails': 1,
+        'limit': 5,
+        'countrycodes': 'in' # Restrict to India
+    }
+    
+    results = []
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(NOMINATIM_URL, params=params, headers=headers, timeout=5.0)
+            
+        if response.status_code == 200:
+            data = response.json()
+            for item in data:
+                lat = float(item.get('lat', 0.0))
+                lon = float(item.get('lon', 0.0))
+                if lat and lon:
+                    results.append({
+                        "name": item.get('display_name', ''),
+                        "lat": lat,
+                        "lon": lon,
+                        "type": item.get('addresstype', 'place'),
+                        "distance_meters": 0.0 # Will be calculated later if needed
+                    })
+    except Exception as e:
+        print(f"Nominatim API error: {e}")
+        
+    return results

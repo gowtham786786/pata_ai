@@ -7,6 +7,8 @@ import { locateAddress } from '../services/apiService';
 import { useAuth } from '../context/AuthContext';
 import ConfidenceRing from '../components/ConfidenceRing';
 import AgentFeed from '../components/AgentFeed';
+import TopNavigation from '../components/TopNavigation';
+import MetricCards from '../components/MetricCards';
 
 // Fix Leaflet marker icon issue
 import L from 'leaflet';
@@ -39,22 +41,24 @@ const HomePage = () => {
   const [status, setStatus] = useState('idle'); // idle, resolving, resolved, error
   const [result, setResult] = useState(null);
   const [errorMsg, setErrorMsg] = useState('');
-  
+  const [conflictData, setConflictData] = useState(null);
+
   const { currentUser } = useAuth();
 
-  const handleLocate = async (e) => {
-    e.preventDefault();
+  const handleLocate = async (e, forceSource = null) => {
+    if (e) e.preventDefault();
     if (!address.trim()) return;
 
     setStatus('resolving');
     setErrorMsg('');
+    setConflictData(null);
     
     try {
       // Get the Firebase Auth token if the user is logged in
       const token = currentUser ? await currentUser.getIdToken() : null;
       
-      // Connect to the Node.js Orchestrator via API Service, passing the token
-      const responseData = await locateAddress(address, token);
+      // Connect to the Node.js Orchestrator via API Service, passing the token and forceSource
+      const responseData = await locateAddress(address, token, forceSource);
       
       if (responseData.success) {
         const payload = responseData.data;
@@ -70,9 +74,12 @@ const HomePage = () => {
         setTimeout(() => {
            setStatus('resolved');
         }, totalRealTimeMs + 50);
+      } else if (responseData.isConflict) {
+        setStatus('conflict');
+        setConflictData(responseData.conflictDetails);
       } else {
         setStatus('error');
-        setErrorMsg(response.data.message || 'Failed to process address.');
+        setErrorMsg(responseData.message || 'Failed to process address.');
       }
     } catch (err) {
       console.error(err);
@@ -98,42 +105,93 @@ const HomePage = () => {
   const mapZoom = status === 'resolved' ? 16 : 5;
 
   return (
-    <div className="h-full flex flex-col bg-navy-950 p-4 lg:p-6 text-slate-200 font-sans overflow-hidden">
+    <div className="h-full flex flex-col p-4 lg:p-6 text-slate-200 font-sans overflow-y-auto overflow-x-hidden relative z-10">
       
-      {/* Top Header & Search Bar */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-4 lg:mb-6 shrink-0">
-        <div>
-          <h1 className="text-xl font-semibold tracking-wide text-slate-100">Pata Location Intelligence</h1>
-          <p className="text-xs text-slate-400 font-mono tracking-widest uppercase mt-1">Multi-Agent Geocoding System</p>
-        </div>
-        
-        <form onSubmit={handleLocate} className="flex w-full lg:w-[600px] shadow-panel">
-          <input
-            type="text"
-            className="flex-1 bg-navy-900 border border-slate-700 border-r-0 text-white px-4 py-3 rounded-l-lg focus:outline-none focus:border-electric transition-colors"
-            placeholder="e.g. opp. sbi bank, mg road, bangalore 560001"
-            value={address}
-            onChange={(e) => setAddress(e.target.value)}
-            disabled={status === 'resolving'}
-          />
+      <TopNavigation />
+      <MetricCards />
+
+      {/* Cyber Search Bar */}
+      <div className="mb-6 z-10 relative">
+        <form onSubmit={handleLocate} className="flex w-full max-w-4xl mx-auto shadow-glow-cyan">
+          <div className="relative flex-1">
+            <input
+              type="text"
+              className="w-full bg-cyber-900/80 backdrop-blur-md border-2 border-electric-glow/30 border-r-0 text-white px-6 py-4 rounded-l-xl focus:outline-none focus:border-electric-glow focus:shadow-[inset_0_0_20px_rgba(0,240,255,0.2)] transition-all text-lg font-mono placeholder:text-slate-500"
+              placeholder="Enter complex Indian address (e.g. opp. sbi bank, mg road...)"
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+              disabled={status === 'resolving'}
+            />
+            <div className="absolute left-6 bottom-1 flex gap-2">
+              <span className="text-[9px] uppercase tracking-widest text-slate-500 font-bold">Autosuggest Enabled</span>
+              <span className="text-[9px] uppercase tracking-widest text-electric-glow font-bold animate-pulse">Live</span>
+            </div>
+          </div>
           <button
             type="submit"
             disabled={status === 'resolving' || !address.trim()}
-            className="bg-electric hover:bg-blue-600 disabled:bg-slate-700 text-white px-6 py-3 rounded-r-lg font-semibold flex items-center transition-colors"
+            className="bg-electric-500 hover:bg-electric-400 disabled:bg-cyber-800 text-white px-8 py-4 rounded-r-xl font-bold uppercase tracking-widest flex items-center transition-all border-2 border-electric-500 border-l-0 shadow-[0_0_15px_rgba(59,130,246,0.5)] hover:shadow-[0_0_25px_rgba(59,130,246,0.8)] disabled:shadow-none disabled:border-cyber-700 disabled:text-slate-500"
           >
-            {status === 'resolving' ? <Loader2 className="animate-spin w-5 h-5" /> : <SearchIcon className="w-5 h-5 mr-2" />}
-            {status === 'resolving' ? 'Processing' : 'Locate'}
+            {status === 'resolving' ? <Loader2 className="animate-spin w-6 h-6" /> : <SearchIcon className="w-6 h-6 mr-3" />}
+            {status === 'resolving' ? 'Initializing...' : 'Locate'}
           </button>
         </form>
       </div>
 
       {errorMsg && (
-         <div className="mb-4 p-3 bg-signal-low/10 border border-signal-low/30 text-signal-low rounded text-sm text-center">
+         <div className="mb-4 p-4 glass-panel-neon border-signal-low/50 text-signal-low rounded-xl text-sm text-center shadow-lg animate-pulse-slow font-mono uppercase tracking-widest">
             {errorMsg}
          </div>
       )}
 
-      {/* 3-Column Grid */}
+      {status === 'conflict' && conflictData ? (
+        <div className="flex-1 flex items-center justify-center p-4">
+          <div className="bg-navy-900 border-2 border-signal-low rounded-lg p-6 lg:p-8 max-w-2xl w-full shadow-2xl">
+            <div className="flex items-center gap-3 mb-6 text-signal-low">
+              <div className="w-10 h-10 rounded-full bg-signal-low/20 flex items-center justify-center">
+                <span className="text-xl font-bold">⚠</span>
+              </div>
+              <h2 className="text-2xl font-bold uppercase tracking-wide">Address Conflict Detected</h2>
+            </div>
+            
+            <p className="text-slate-300 mb-6 leading-relaxed">
+              The coordinates you provided point to a different location than the text address. The system requires your input to resolve this conflict.
+            </p>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+              <div className="bg-navy-950 p-4 rounded border border-slate-800">
+                <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Text Address</h4>
+                <p className="text-sm text-slate-200">{conflictData.textAddress}</p>
+              </div>
+              <div className="bg-navy-950 p-4 rounded border border-slate-800">
+                <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Coordinates point to</h4>
+                <p className="text-sm text-slate-200 mb-1">{conflictData.reverseAddress}</p>
+                <p className="text-xs text-electric font-mono">{conflictData.coordinates}</p>
+              </div>
+            </div>
+            
+            <div className="bg-signal-low/10 border border-signal-low/30 p-4 rounded mb-8">
+               <span className="text-signal-low font-semibold text-sm">Reason: </span>
+               <span className="text-slate-300 text-sm">{conflictData.reason}</span>
+            </div>
+            
+            <div className="flex flex-col sm:flex-row gap-4">
+              <button 
+                onClick={() => handleLocate(null, 'coordinates')}
+                className="flex-1 bg-navy-800 hover:bg-navy-700 border border-slate-600 text-white px-4 py-3 rounded font-semibold transition-colors"
+              >
+                Use User Coordinates
+              </button>
+              <button 
+                onClick={() => handleLocate(null, 'text')}
+                className="flex-1 bg-electric hover:bg-blue-600 text-white px-4 py-3 rounded font-semibold transition-colors"
+              >
+                Use Text Address Search
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : (
       <div className="flex flex-col lg:grid lg:grid-cols-12 gap-4 lg:gap-6 flex-1 min-h-0">
         
         {/* COLUMN 1: LEFT PANEL (Address Breakdown) */}
@@ -175,18 +233,17 @@ const HomePage = () => {
             </div>
           </div>
 
-          {/* Pincode Verification Card */}
-          <div className="bg-navy-900 rounded-lg p-4 shadow-panel border border-slate-800 flex items-center justify-between">
+          {/* Location Source Card */}
+          <div className="bg-navy-900 rounded-lg p-4 shadow-panel border border-slate-800 flex flex-col justify-between">
              <div className="flex flex-col">
-                <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Pincode Check</h3>
-                <span className={clsx("text-xs", status === 'resolved' ? 'text-slate-300' : 'text-slate-600')}>
-                   {status === 'resolved' ? `Region: ${result?.evidence?.find(e => e.includes('Agent 2')) ? 'Verified' : 'Unknown'}` : '—'}
+                <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Location Source</h3>
+                <span className={clsx("text-xs font-semibold uppercase tracking-wider", status === 'resolved' ? 'text-signal-high' : 'text-slate-600')}>
+                   {status === 'resolved' ? result?.locationSource || 'Unknown' : 'Standby'}
                 </span>
-                <span className={clsx("text-xs font-semibold mt-1 uppercase tracking-wider", status === 'resolved' ? 'text-signal-high' : 'text-slate-600')}>
-                   {status === 'resolved' ? 'Match Confirmed' : 'Standby'}
+                <span className={clsx("text-xs mt-2 leading-relaxed", status === 'resolved' ? 'text-slate-300' : 'text-slate-600')}>
+                   {status === 'resolved' ? result?.explanation || 'Waiting for AI processing...' : '—'}
                 </span>
              </div>
-             <ConfidenceRing value={status === 'resolved' ? 100 : 0} size={48} strokeWidth={4} />
           </div>
 
         </div>
@@ -236,6 +293,7 @@ const HomePage = () => {
         </div>
 
       </div>
+      )}
     </div>
   );
 };

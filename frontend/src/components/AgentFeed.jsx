@@ -2,9 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronDown, ChevronUp, Terminal, Zap, ShieldCheck, MapPin, Search } from 'lucide-react';
 import clsx from 'clsx';
+import EvidenceModal from './EvidenceModal';
 
 const AgentFeed = ({ status, result }) => {
   const [showReasoning, setShowReasoning] = useState(false);
+  const [showModal, setShowModal] = useState(false);
   const [activeStep, setActiveStep] = useState(-1);
 
   // Handle staggered animation based on real backend timings
@@ -138,6 +140,7 @@ const AgentFeed = ({ status, result }) => {
       {/* Footer Action */}
       <div className="p-4 border-t border-slate-800 bg-navy-950/50">
         <button 
+          onClick={() => setShowModal(true)}
           disabled={status !== 'resolved'}
           className={clsx("w-full py-2 text-xs font-semibold uppercase tracking-wider rounded transition-colors border",
              status === 'resolved' ? "bg-electric/10 hover:bg-electric/20 text-electric border-electric/20 cursor-pointer" : "bg-navy-900 text-slate-600 border-slate-800 cursor-not-allowed")}
@@ -145,6 +148,12 @@ const AgentFeed = ({ status, result }) => {
           View Full Evidence Log
         </button>
       </div>
+
+      <EvidenceModal 
+        isOpen={showModal} 
+        onClose={() => setShowModal(false)} 
+        result={result} 
+      />
     </div>
   );
 };

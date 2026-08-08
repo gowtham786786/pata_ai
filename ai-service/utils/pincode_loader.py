@@ -1,40 +1,67 @@
 import pandas as pd
 import os
 import time
+import firebase_admin
+from firebase_admin import credentials, firestore
+from dotenv import load_dotenv
 
 # Global variable to hold the pincode data in memory
 PINCODE_DB = None
 PLACE_DB = None
 
+def init_firebase():
+    if not firebase_admin._apps:
+        env_path = os.path.join(os.path.dirname(__file__), '../../backend/.env')
+        if os.path.exists(env_path):
+            load_dotenv(env_path)
+            
+        project_id = os.environ.get('FIREBASE_PROJECT_ID', 'pataai')
+        cred = credentials.ApplicationDefault()
+        
+        private_key = os.environ.get('FIREBASE_PRIVATE_KEY')
+        client_email = os.environ.get('FIREBASE_CLIENT_EMAIL')
+        
+        if private_key and client_email:
+            cred = credentials.Certificate({
+                "type": "service_account",
+                "project_id": project_id,
+                "private_key": private_key.replace('\\n', '\n'),
+                "client_email": client_email,
+                "token_uri": "https://oauth2.googleapis.com/token",
+            })
+            
+        firebase_admin.initialize_app(cred, {'projectId': project_id})
+    return firestore.client()
+
 def load_pincode_data():
     """
-    Loads the All India Pincode Directory CSV into memory.
-    This runs once at FastAPI startup to ensure sub-500ms processing.
+    Loads the All India Pincode Directory from local CSV into memory.
+    This bypasses Firebase to prevent Quota Exceeded errors and is much faster.
     """
     global PINCODE_DB
     global PLACE_DB
     
-    # Path robust against execution CWD
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    dataset_path = os.path.join(current_dir, '../../datasets/pincode_data.csv')
-    
     try:
         start_time = time.time()
-        print(f"Loading pincode dataset from {dataset_path}...")
+        csv_path = os.path.join(os.path.dirname(__file__), '../../datasets/pincode_data.csv')
+        print(f"Loading pincode dataset from {csv_path}...")
         
-        if not os.path.exists(dataset_path):
-            print("WARNING: Pincode dataset not found. Using an empty dataset for now.")
-            # Create an empty dataframe with expected columns for safety
+        if not os.path.exists(csv_path):
+            print(f"WARNING: CSV not found at {csv_path}. Using an empty dataset.")
             PINCODE_DB = pd.DataFrame(columns=['pincode', 'place_name', 'state', 'district', 'latitude', 'longitude'])
             PLACE_DB = pd.DataFrame()
             return
-
-        # Load CSV into Pandas DataFrame, forcing pincode to string
-        df = pd.read_csv(dataset_path, dtype={'pincode': str})
+            
+        # Load from local CSV
+        df = pd.read_csv(csv_path)
         
-        # Clean the pincode column of hidden whitespace or characters
+        # Rename columns to match expected schema if necessary, or just rely on CSV headers
+        # The CSV has: pincode, village_locality_name, state, district, latitude, longitude
+        df.rename(columns={'village_locality_name': 'place_name'}, inplace=True)
+        
+        # Ensure pincode is a string and clean whitespace
         if 'pincode' in df.columns:
-            df['pincode'] = df['pincode'].str.strip()
+            df['pincode'] = df['pincode'].astype(str).str.strip()
             
         # Create Pincode Index (Primary)
         PINCODE_DB = df.copy()
@@ -44,16 +71,16 @@ def load_pincode_data():
         # We lowercase the place names for easier searching
         if 'place_name' in df.columns:
             PLACE_DB = df.copy()
-            PLACE_DB['place_name_lower'] = PLACE_DB['place_name'].str.lower()
+            PLACE_DB['place_name_lower'] = PLACE_DB['place_name'].astype(str).str.lower()
             # Drop duplicates to keep the first match for a city
             PLACE_DB.drop_duplicates(subset=['place_name_lower'], keep='first', inplace=True)
             PLACE_DB.set_index('place_name_lower', inplace=True)
             
         duration = time.time() - start_time
-        print(f"Successfully loaded {len(PINCODE_DB)} pincode records in {duration:.2f} seconds.")
+        print(f"Successfully loaded {len(PINCODE_DB)} pincode records from CSV in {duration:.2f} seconds.")
         
     except Exception as e:
-        print(f"Error loading pincode data: {e}")
+        print(f"Error loading pincode data from Firebase: {e}")
         PINCODE_DB = pd.DataFrame()
         PLACE_DB = pd.DataFrame()
 
