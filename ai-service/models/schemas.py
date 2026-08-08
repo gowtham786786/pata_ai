@@ -22,7 +22,7 @@ class ExtractedEntities(BaseModel):
 
 class LandmarkEvidence(BaseModel):
     name: str
-    distance_meters: float
+    distance_from_ref: float
     type: str
 
 class GeocodeResponse(BaseModel):

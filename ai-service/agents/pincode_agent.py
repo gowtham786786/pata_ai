@@ -45,8 +45,8 @@ class PincodeVerificationAgent:
             "valid": True,
             "state_match": state_match,
             "city_match": city_match,
-            "reference_latitude": str(data.get('lat', '')),
-            "reference_longitude": str(data.get('lon', '')),
+            "reference_latitude": str(data.get('latitude', '')),
+            "reference_longitude": str(data.get('longitude', '')),
             "issues": issues
         }
         
