@@ -7,7 +7,6 @@ import { locateAddress } from '../services/apiService';
 import { useAuth } from '../context/AuthContext';
 import AgentFeed from '../components/AgentFeed';
 import TopNavigation from '../components/TopNavigation';
-import MetricCards from '../components/MetricCards';
 import EvidenceModal from '../components/EvidenceModal'; // Assuming we have it
 
 import L from 'leaflet';
@@ -114,7 +113,6 @@ const LocateAddress = () => {
     <div className="h-full flex flex-col p-4 lg:p-6 text-slate-200 font-sans overflow-y-auto overflow-x-hidden relative z-10">
       
       <TopNavigation />
-      <MetricCards />
 
       {/* Cyber Search Bar */}
       <div className="mb-6 z-10 relative">

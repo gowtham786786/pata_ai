@@ -25,22 +25,7 @@ const TopNavigation = () => {
       </div>
 
       <div className="flex items-center gap-6">
-        <div className="hidden lg:flex items-center gap-4 text-xs font-mono tracking-widest uppercase">
-          <div className="flex items-center gap-1.5 text-slate-300">
-            <Database size={14} className="text-purple-400" />
-            <span>Firebase <span className="text-signal-neon">Ok</span></span>
-          </div>
-          <div className="flex items-center gap-1.5 text-slate-300">
-            <Activity size={14} className="text-electric-400" />
-            <span>AI Service <span className="text-signal-neon">Ok</span></span>
-          </div>
-          <div className="flex items-center gap-1.5 text-slate-300">
-            <MapIcon size={14} className="text-orange-400" />
-            <span>OSM <span className="text-signal-neon">Ok</span></span>
-          </div>
-        </div>
 
-        <div className="h-6 w-px bg-white/10 hidden lg:block"></div>
 
         <div className="flex items-center gap-4">
           <span className="font-mono text-sm text-electric-glow tracking-widest">{time}</span>

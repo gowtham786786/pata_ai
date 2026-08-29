@@ -10,9 +10,12 @@ class ExtractedEntities(BaseModel):
     landmark: Optional[str] = None
     relation: Optional[str] = None
     locality: Optional[str] = None
+    village: Optional[str] = None
+    town: Optional[str] = None
     city: Optional[str] = None
     district: Optional[str] = None
     state: Optional[str] = None
+    country: str = "India"
     pincode: Optional[str] = None
     street: Optional[str] = None
     house_number: Optional[str] = None

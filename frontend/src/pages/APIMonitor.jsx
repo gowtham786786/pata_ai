@@ -1,16 +1,35 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Server, Activity, ArrowUpRight, ArrowDownRight } from 'lucide-react';
 import { motion } from 'framer-motion';
 
+const initialServices = [
+  { name: 'Node.js Backend', status: 'Online', latency: 45, uptime: '99.99%', load: '12%', color: 'text-emerald-400', bg: 'bg-emerald-500/10' },
+  { name: 'FastAPI AI Service', status: 'Online', latency: 120, uptime: '99.95%', load: '45%', color: 'text-emerald-400', bg: 'bg-emerald-500/10' },
+  { name: 'Firebase Firestore', status: 'Online', latency: 30, uptime: '100%', load: 'N/A', color: 'text-emerald-400', bg: 'bg-emerald-500/10' },
+  { name: 'Firebase Auth', status: 'Online', latency: 25, uptime: '100%', load: 'N/A', color: 'text-emerald-400', bg: 'bg-emerald-500/10' },
+  { name: 'OpenStreetMap API', status: 'Warning', latency: 850, uptime: '98.2%', load: 'N/A', color: 'text-amber-400', bg: 'bg-amber-500/10' },
+  { name: 'Nominatim Service', status: 'Online', latency: 320, uptime: '99.5%', load: 'N/A', color: 'text-emerald-400', bg: 'bg-emerald-500/10' },
+];
+
 const APIMonitor = () => {
-  const services = [
-    { name: 'Node.js Backend', status: 'Online', latency: 45, uptime: '99.99%', load: '12%', color: 'text-emerald-400', bg: 'bg-emerald-500/10' },
-    { name: 'FastAPI AI Service', status: 'Online', latency: 120, uptime: '99.95%', load: '45%', color: 'text-emerald-400', bg: 'bg-emerald-500/10' },
-    { name: 'Firebase Firestore', status: 'Online', latency: 30, uptime: '100%', load: 'N/A', color: 'text-emerald-400', bg: 'bg-emerald-500/10' },
-    { name: 'Firebase Auth', status: 'Online', latency: 25, uptime: '100%', load: 'N/A', color: 'text-emerald-400', bg: 'bg-emerald-500/10' },
-    { name: 'OpenStreetMap API', status: 'Warning', latency: 850, uptime: '98.2%', load: 'N/A', color: 'text-amber-400', bg: 'bg-amber-500/10' },
-    { name: 'Nominatim Service', status: 'Online', latency: 320, uptime: '99.5%', load: 'N/A', color: 'text-emerald-400', bg: 'bg-emerald-500/10' },
-  ];
+  const [services, setServices] = useState(initialServices);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setServices(prevServices => prevServices.map(service => {
+        const jitter = 1 + (Math.random() * 0.4 - 0.2); // +/- 20%
+        let newLatency = Math.round(service.latency * jitter);
+        if (newLatency < 10) newLatency = 10;
+        
+        const newStatus = newLatency > 700 ? 'Warning' : 'Online';
+        const newColor = newStatus === 'Online' ? 'text-emerald-400' : 'text-amber-400';
+        const newBg = newStatus === 'Online' ? 'bg-emerald-500/10' : 'bg-amber-500/10';
+        
+        return { ...service, latency: newLatency, status: newStatus, color: newColor, bg: newBg };
+      }));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   return (
     <div className="p-8 h-full flex flex-col bg-navy-950 font-sans text-slate-200 overflow-y-auto">

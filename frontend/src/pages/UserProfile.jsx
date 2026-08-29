@@ -37,7 +37,7 @@ const UserProfile = () => {
              </div>
              <div className="p-4 bg-navy-950 border border-slate-800 rounded">
                 <div className="text-xs text-slate-500 uppercase tracking-widest flex items-center mb-1"><Shield className="w-3 h-3 mr-2" /> User ID</div>
-                <div className="font-mono text-slate-200 truncate">{currentUser?.uid || 'N/A'}</div>
+                <div className="font-mono text-slate-200 truncate">{currentUser?.uid ? Array.from(currentUser.uid).map(c => c.charCodeAt(0)).join('').substring(0, 10) : 'N/A'}</div>
              </div>
              <div className="p-4 bg-navy-950 border border-slate-800 rounded">
                 <div className="text-xs text-slate-500 uppercase tracking-widest flex items-center mb-1"><Calendar className="w-3 h-3 mr-2" /> Account Created</div>

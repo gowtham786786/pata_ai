@@ -76,6 +76,7 @@ const locateAddress = async (req, res, next) => {
             locationSource: aiResponse.locationSource || 'Unknown',
             explanation: aiResponse.explanation || '',
             confidence: aiResponse.confidence,
+            confidenceScore: aiResponse.confidenceScore || 0,
             status: aiResponse.confidence === 'High' ? 'Resolved' : 'Review_Needed',
             evidence: aiResponse.evidence || [],
             agentSteps: aiResponse.agentSteps || [],
@@ -107,7 +108,7 @@ const locateAddress = async (req, res, next) => {
                 locality: parsed.locality || parsed.village || '',
                 district: parsed.district || '',
                 state: parsed.state || '',
-                confidence_score: aiResponse.confidence_score || 0,
+                confidence_score: aiResponse.confidenceScore || 0,
                 confidence_level: aiResponse.confidence,
                 timestamp: Date.now(),
                 processing_time_ms: processingTime
@@ -125,6 +126,7 @@ const locateAddress = async (req, res, next) => {
                     locationSource: aiResponse.locationSource || 'Unknown',
                     explanation: aiResponse.explanation || '',
                     confidence: aiResponse.confidence,
+                    confidenceScore: aiResponse.confidenceScore || 0,
                     createdAt: new Date().toISOString()
                 });
             }

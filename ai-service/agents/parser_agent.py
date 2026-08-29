@@ -42,7 +42,7 @@ class AddressParserAgent:
                 break
                 
         # 3. House No / Plot No
-        house_match = re.search(r'\b(?:house no|h no|plot no|flat no|door no|#|no\.?)\s*[:#-]?\s*([a-z0-9/-]+)\b', address)
+        house_match = re.search(r'\b(?:house no|h\.?no|plot no|flat no|flat|door no|d\.?no|#|no\.?)\s*[:#-]?\s*([a-z0-9/-]+)\b', address)
         if house_match:
             entities.house_number = house_match.group(1).strip()
             
@@ -63,6 +63,15 @@ class AddressParserAgent:
                     entities.landmark = lm
                     rel = rev_match.group(2).strip()
                     entities.relation = self.RELATION_KEYWORDS.get(rel, rel)
+            else:
+                # NEW FALLBACK: if no relation keyword, use the first comma-separated part as landmark,
+                # provided it's not a house number. If it is, move to the next part.
+                parts = [p.strip() for p in raw_address.split(',') if p.strip()]
+                for part in parts:
+                    if part and not re.search(r'\b(?:house no|h\.?no|plot no|flat no|flat|door no|d\.?no|#|no\.?)\b', part.lower()):
+                        if not re.match(r'^\d+[a-z]?$', part.lower()):
+                            entities.landmark = part.title()
+                            break
                     
         # 5. Street / Road
         road_match = re.search(r'\b([a-z0-9\s]+(?:road|rd|street|st|marg|highway))\b', address)
@@ -79,14 +88,20 @@ class AddressParserAgent:
         if district_match:
             entities.district = district_match.group(1).replace('district', '').replace('dist', '').strip().title()
 
-        # 8. City fallback
-        # Try to identify city by looking at the last remaining significant token
+        # 8. City and Locality fallback
+        # Try to identify city and locality by looking at the remaining significant tokens
         address_clean = re.sub(r'[^\w\s,]', ' ', address)
         parts = [p.strip() for p in address_clean.split(',') if p.strip()]
         if parts:
             potential_city = parts[-1]
             if len(potential_city) > 2 and not any(k in potential_city for k in self.RELATION_KEYWORDS.keys()):
                 entities.city = potential_city.title()
+                
+            # If no locality was found by regex, fallback to the part before the city
+            if not entities.locality and len(parts) >= 2:
+                potential_locality = parts[-2]
+                if len(potential_locality) > 2:
+                    entities.locality = potential_locality.title()
                 
         # 9. Language and Transliteration (Heuristic)
         # If the original address contains Telugu/Hindi scripts

@@ -54,11 +54,20 @@ async def run_agent_workflow(raw_address: str, force_source: Optional[str] = Non
         log_step(3, "Agent 3: OSM Landmark Finder", t2, "Skipped", "No reference coordinate available", "error")
         return build_fallback_response(raw_address, parsed, agent_steps, evidence_log, "No reference pincode coordinate available.")
 
-    # --- Agent 3: OSM Landmark Finder ---
+    # --- Agent 3: Landmark Intelligence ---
     t3 = time.perf_counter()
-    candidates, geo_ev = await osm_agent.search(parsed, ref_lat, ref_lon)
-    evidence_log.append(f"Agent 3: {geo_ev}")
-    log_step(3, "Agent 3: OSM Landmark Finder", t3, f"Found {len(candidates)} candidate landmarks", geo_ev, "success" if candidates else "warning")
+    agent3_result = await osm_agent.search(parsed, ref_lat, ref_lon)
+    candidates = agent3_result.get('candidates', [])
+    for ev in agent3_result.get('evidence', []):
+        evidence_log.append(f"Agent 3: {ev}")
+        
+    relation = agent3_result.get('relationship', 'unknown')
+    parsed.relation = relation if relation != "unknown" else parsed.relation
+    
+    log_status = "success" if agent3_result['status'] == 'candidates_found' else ("warning" if agent3_result['status'] == 'not_found' else "error")
+    geo_ev = f"Found {len(candidates)} candidate landmarks" if candidates else "No candidates found via OpenStreetMap."
+    queries_attempted = " and ".join(agent3_result.get('queries_attempted', []))
+    log_step(3, "Agent 3: Landmark Intelligence", t3, geo_ev, queries_attempted if queries_attempted else "No queries attempted", log_status)
     
     if not candidates:
         return build_fallback_response(raw_address, parsed, agent_steps, evidence_log, "No candidates found via Overpass OSM.", float(ref_lat), float(ref_lon))
@@ -105,6 +114,12 @@ async def run_agent_workflow(raw_address: str, force_source: Optional[str] = Non
     }
 
 def build_fallback_response(raw_address: str, parsed, agent_steps, evidence_log, reason: str, ref_lat: float = None, ref_lon: float = None):
+    # Add dummy steps for UI if aborted early
+    if len(agent_steps) < 4:
+        agent_steps.append({"id": 4, "name": "Agent 4: Candidate Ranker", "result": "Skipped", "detail": "No candidates to rank", "timeMs": 1, "status": "warning"})
+    if len(agent_steps) < 5:
+        agent_steps.append({"id": 5, "name": "Agent 5: Geospatial Verifier", "result": "Fallback Used", "detail": "Defaulted to pincode centroid", "timeMs": 1, "status": "warning"})
+    
     return {
         "status": "success",
         "originalAddress": raw_address,
