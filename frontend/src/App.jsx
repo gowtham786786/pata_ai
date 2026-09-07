@@ -24,7 +24,16 @@ import AnimatedBackground from './components/AnimatedBackground';
 import { useAuth } from './context/AuthContext';
 
 function App() {
-  const { currentUser, userRole } = useAuth();
+  const { currentUser, userRole, loading } = useAuth();
+  const isAdmin = userRole === 'admin' || currentUser?.email === 'reddygowtham397@gmail.com';
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#06080F]">
+        <div className="w-8 h-8 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
   
   return (
     <Router>
@@ -33,7 +42,7 @@ function App() {
         {/* Root Redirect Logic */}
         <Route path="/" element={
           currentUser ? (
-            userRole === 'admin' ? <Navigate to="/admin" replace /> : <Navigate to="/user" replace />
+            isAdmin ? <Navigate to="/admin" replace /> : <Navigate to="/user" replace />
           ) : (
             <WelcomeScreen />
           )
@@ -41,7 +50,7 @@ function App() {
 
         <Route path="/login" element={
           currentUser ? (
-            userRole === 'admin' ? <Navigate to="/admin" replace /> : <Navigate to="/user" replace />
+            isAdmin ? <Navigate to="/admin" replace /> : <Navigate to="/user" replace />
           ) : (
             <LoginPage />
           )

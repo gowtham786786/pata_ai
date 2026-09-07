@@ -1,6 +1,7 @@
 const axios = require('axios');
 const { generateHash } = require('../utils/cryptoUtils');
 const { db } = require('../firebase/firebase');
+const { getAuth } = require('firebase-admin/auth');
 
 const locateAddress = async (req, res, next) => {
     try {
@@ -346,6 +347,50 @@ const getCorrections = async (req, res) => {
     }
 };
 
+// 8. Verify and Get User Role (bypasses client-side firestore rules)
+const getUserRole = async (req, res) => {
+    try {
+        const user = req.user;
+        if (!user || !user.uid) {
+            return res.status(401).json({ success: false, message: 'Unauthorized: User not authenticated' });
+        }
+
+        let role = 'user';
+
+        // 1. Check custom claim on decoded token
+        if (user.role === 'admin') {
+            role = 'admin';
+        } 
+        // 2. Check known admin email
+        else if (user.email === 'reddygowtham397@gmail.com') {
+            role = 'admin';
+            try {
+                await getAuth().setCustomUserClaims(user.uid, { role: 'admin' });
+                await db.collection('users').doc(user.uid).set({ role: 'admin', email: user.email }, { merge: true });
+            } catch (e) {
+                console.warn('Could not auto-assign custom claims:', e.message);
+            }
+        } 
+        // 3. Check Firestore users collection using Admin SDK
+        else {
+            try {
+                const userDoc = await db.collection('users').doc(user.uid).get();
+                if (userDoc.exists && userDoc.data().role === 'admin') {
+                    role = 'admin';
+                    await getAuth().setCustomUserClaims(user.uid, { role: 'admin' });
+                }
+            } catch (e) {
+                console.warn('Firestore role check error in backend:', e.message);
+            }
+        }
+
+        return res.status(200).json({ success: true, role, email: user.email });
+    } catch (error) {
+        console.error('Error in getUserRole:', error.message);
+        return res.status(500).json({ success: false, error: error.message });
+    }
+};
+
 module.exports = {
     locateAddress,
     getHistory,
@@ -353,5 +398,6 @@ module.exports = {
     checkCache,
     submitFeedback,
     getGeocodeLogs,
-    getCorrections
+    getCorrections,
+    getUserRole
 };

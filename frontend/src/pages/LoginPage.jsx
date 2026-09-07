@@ -23,12 +23,20 @@ const LoginPage = () => {
     setLoading(true);
 
     try {
+      let detectedRole = 'user';
       if (isRegister) {
-        await registerWithEmail(email, password, name);
+        const res = await registerWithEmail(email, password, name);
+        detectedRole = res?.role || 'user';
       } else {
-        await loginWithEmail(email, password);
+        const res = await loginWithEmail(email, password);
+        detectedRole = res?.role || (email.toLowerCase().trim() === 'reddygowtham397@gmail.com' ? 'admin' : 'user');
       }
-      navigate(portalIntent === 'admin' ? '/admin' : '/user');
+
+      if (detectedRole === 'admin' || portalIntent === 'admin') {
+        navigate('/admin', { replace: true });
+      } else {
+        navigate('/user', { replace: true });
+      }
     } catch (err) {
       console.error(err);
       if (err.code === 'auth/invalid-credential' || err.message?.includes('auth/invalid-credential')) {
@@ -46,8 +54,13 @@ const LoginPage = () => {
     try {
       setError('');
       setLoading(true);
-      await loginWithGoogle();
-      navigate(portalIntent === 'admin' ? '/admin' : '/user');
+      const res = await loginWithGoogle();
+      const detectedRole = res?.role || 'user';
+      if (detectedRole === 'admin' || portalIntent === 'admin') {
+        navigate('/admin', { replace: true });
+      } else {
+        navigate('/user', { replace: true });
+      }
     } catch (err) {
       console.error(err);
       setError('Google Sign-In failed: ' + (err.message || 'Please check popup settings.'));

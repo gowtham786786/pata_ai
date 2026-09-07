@@ -46,7 +46,10 @@ async function createAdmin() {
             lastLogin: new Date().toISOString()
         }, { merge: true });
 
-        console.log(`Successfully assigned 'admin' role in Firestore for ${email}`);
+        // Set custom user claims so token natively carries role='admin'
+        await getAuth().setCustomUserClaims(userRecord.uid, { role: 'admin' });
+
+        console.log(`Successfully assigned 'admin' role in Firestore & Auth Claims for ${email}`);
         process.exit(0);
     } catch (error) {
         console.error("Error creating admin:", error);

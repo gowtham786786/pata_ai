@@ -87,16 +87,16 @@ const AdminDashboard = () => {
   };
 
   return (
-    <div className="p-8 h-full flex flex-col bg-navy-950 font-sans text-slate-200 overflow-y-auto">
-      <div className="flex items-center space-x-3 mb-8">
-        <LayoutDashboard className="text-electric" size={28} />
+    <div className="p-4 sm:p-8 min-h-full pb-12 flex flex-col font-sans text-slate-200 overflow-y-auto custom-scrollbar">
+      <div className="flex items-center space-x-3 mb-6">
+        <LayoutDashboard className="text-cyan-400" size={28} />
         <div>
-           <h1 className="text-2xl font-semibold tracking-wide text-slate-100">System Admin</h1>
-           <p className="text-xs text-slate-400 font-mono uppercase tracking-widest mt-1">Geospatial Telemetry & Feedback</p>
+           <h1 className="text-2xl font-bold tracking-tight text-white">System Admin Console</h1>
+           <p className="text-xs text-slate-400 font-mono uppercase tracking-widest mt-0.5">Geospatial Telemetry & Feedback</p>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-8">
         
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0 }}
           className="bg-navy-900 border border-slate-800 p-6 rounded-lg shadow-panel flex items-center justify-between"
@@ -149,9 +149,9 @@ const AdminDashboard = () => {
           <div className="flex-1 bg-navy-900 border border-slate-800 rounded-lg shadow-panel overflow-hidden relative z-0">
              <MapContainer center={[20.5937, 78.9629]} zoom={4} style={{ height: '100%', width: '100%', backgroundColor: '#020617' }}>
                 <TileLayer
-                  className="map-tiles-dark"
-                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                  attribution='&copy; OSM'
+                  attribution='&copy; <a href="https://www.esri.com/">Esri</a> &copy; OpenStreetMap'
+                  url="https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}"
+                  maxZoom={16}
                 />
                 {logs.map((log, idx) => {
                   if (log.latitude && log.longitude) {
