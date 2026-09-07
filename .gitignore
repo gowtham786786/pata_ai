@@ -7,3 +7,6 @@ venv/
 __pycache__/
 *.pyc
 .DS_Store
+serviceAccountKey.json
+*credentials*.json
+*.log

@@ -2,52 +2,35 @@ from typing import Tuple, List, Dict, Any
 
 class SelfCheckAgent:
     """
-    Agent 5: Geospatial Verification & Self-Check
-    Performs 10 critical validation checks.
+    Agent 5: Self-Check / Composer
+    Selects the most precise coordinate available, reports the FULL composite score,
+    and maps the score to a confidence tier.
     """
     
-    def review(self, candidates: List[Dict[str, Any]], parsed_data: Any) -> Tuple[bool, str]:
+    def compose(self, candidates: List[Dict[str, Any]], parsed_data: Any) -> Tuple[Dict[str, Any], str, str]:
         """
-        Returns (passed_critical_checks, audit_reason)
+        Returns (best_candidate, confidence_tier, audit_reason)
         """
         if not candidates:
-            return False, "Self Check Failed: No candidates available."
-            
-        best = candidates[0]
-        ev = best.get('evidence_details', {})
-        
-        # 1. Does pincode match?
-        # 2. Does city match?
-        # 3. Does locality match?
-        # 4. Does landmark match?
-        # 5. Is the candidate actually from OSM?
-        if best.get('source') != "OpenStreetMap":
-            return False, "Self Check Failed: Candidate not from reliable OSM source."
-            
-        # 6. Are coordinates valid?
-        lat = best.get('lat')
-        lon = best.get('lon')
-        if not lat or not lon:
-            return False, "Self Check Failed: Missing coordinates."
-            
-        # 7. Is the candidate score internally consistent?
-        if best.get('total_score', 0) < 60:
-            return False, "Self Check Failed: Score below minimum threshold for confidence."
-            
-        # 8. Is confidence justified?
-        if parsed_data.landmark and not ev.get('landmark_match'):
-             return False, "Self Check Failed: Landmark requested but not found/verified."
-             
-        # 9. Is there a competing candidate with a similar score?
-        if len(candidates) > 1:
-            second_best = candidates[1]
-            diff = best.get('total_score', 0) - second_best.get('total_score', 0)
-            if diff < 2 and best.get('total_score', 0) > 0:
-                return False, "AMBIGUOUS: Multiple candidates have nearly identical scores."
-                
-        # 10. Should the system ask the user instead of guessing?
-        if ev.get('pincode_match') == False and ev.get('city_match') == False:
-            return False, "Self Check Failed: Both Pincode and City mismatch. Too risky to guess."
-            
-        return True, "Self Check Passed."
+            return None, "LOW", "Failed to resolve any location."
 
+        # The candidates are already sorted by total_score desc in Agent 4
+        best = candidates[0]
+        score = best.get('total_score', 0)
+        source = best.get('source', 'Unknown')
+        
+        # Priority order is naturally handled by the scoring engine giving higher points to landmark matches,
+        # but if we didn't find a landmark, we fallback to the highest scoring candidate (which is the dummy reference centroid)
+        
+        # Determine tier
+        if score >= 80:
+            tier = "HIGH"
+            audit_reason = f"High confidence match ({score}/100) using {source}."
+        elif score >= 50:
+            tier = "MEDIUM"
+            audit_reason = f"Medium confidence match ({score}/100) using {source}."
+        else:
+            tier = "LOW"
+            audit_reason = f"LOW CONFIDENCE / MANUAL REVIEW REQUIRED: Score too low ({score}/100). Falling back to {source}."
+
+        return best, tier, audit_reason

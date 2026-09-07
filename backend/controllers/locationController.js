@@ -201,11 +201,10 @@ const locateAddress = async (req, res, next) => {
 
 const getHistory = async (req, res, next) => {
     try {
-        // Normally, this would extract userId from decoded token via authMiddleware
-        const userId = req.query.userId || req.body.userId; 
+        const userId = req.user?.uid || req.query.userId || req.body.userId; 
         
         if (!userId) {
-            return res.status(401).json({ success: false, message: 'Unauthorized' });
+            return res.status(401).json({ success: false, message: 'Unauthorized: User ID required' });
         }
 
         const snapshot = await db.collection('search_history')

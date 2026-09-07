@@ -24,6 +24,17 @@ class AddressParserAgent:
         "in front of": "in front of"
     }
 
+    # Mock Alias Table (Can be moved to Firebase later)
+    ALIAS_TABLE = {
+        "ram nagar": "ramnagar",
+        "b'lore": "bangalore",
+        "bengaluru": "bangalore",
+        "mgr road": "mg road",
+        "m g road": "mg road",
+        "apollo hosp": "apollo hospital",
+        "apollo hospital": "apollo hospital",
+    }
+
     def parse(self, raw_address: str) -> ExtractedEntities:
         entities = ExtractedEntities(raw_address=raw_address)
         address = raw_address.lower().strip()
@@ -117,6 +128,20 @@ class AddressParserAgent:
         else:
             entities.language = "English"
             entities.transliterated = False
+            
+        # Normalize fields via alias table
+        def normalize_field(val: str) -> str:
+            if not val:
+                return val
+            # Strip punctuation and lowercase
+            val_lower = re.sub(r'[^\w\s]', '', val).lower().strip()
+            # Replace via alias table if present, otherwise return lowercase string
+            return self.ALIAS_TABLE.get(val_lower, val_lower)
+
+        entities.landmark = normalize_field(entities.landmark)
+        entities.locality = normalize_field(entities.locality)
+        entities.city = normalize_field(entities.city)
+        entities.street = normalize_field(entities.street)
             
         entities.confidence = 0.95 if entities.landmark and entities.pincode else 0.70
                 

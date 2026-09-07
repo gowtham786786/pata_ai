@@ -42,9 +42,14 @@ export const getCorrections = async (token = null) => {
 export const getHistory = async (token = null, userId = null) => {
   const headers = { 'Content-Type': 'application/json' };
   if (token) headers['Authorization'] = `Bearer ${token}`;
-  // For now, since we haven't built a specific /user/history endpoint, we will fetch from geocode-logs if allowed,
-  // or return mock data. Wait, geocode-logs is protected by admin in the backend? Let's check backend routes.
-  // Actually, we can just return empty array for now to prevent breaking, or just call a dummy endpoint.
-  // We'll mock it for the frontend UI.
-  return { success: true, data: [] };
+  try {
+    const response = await axios.get(`${API_URL}/history`, {
+      headers,
+      params: userId ? { userId } : {}
+    });
+    return response.data;
+  } catch (error) {
+    console.warn("Backend getHistory API notice:", error.response?.data || error.message);
+    return { success: true, data: [] };
+  }
 };

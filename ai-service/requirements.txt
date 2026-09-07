@@ -5,4 +5,4 @@ pandas
 httpx
 python-dotenv
 firebase-admin
-thefuzz
+rapidfuzz

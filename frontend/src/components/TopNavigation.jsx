@@ -1,46 +1,45 @@
 import React, { useState, useEffect } from 'react';
-import { Bell, Activity, Database, Map as MapIcon, ChevronDown } from 'lucide-react';
-import { useAuth } from '../context/AuthContext';
+import { Sparkles, Clock, ShieldCheck } from 'lucide-react';
 
-const TopNavigation = () => {
-  const { currentUser } = useAuth();
-  const [time, setTime] = useState(new Date().toLocaleTimeString());
+const TopNavigation = ({ 
+  title = "Address Resolver", 
+  subtitle = "Deterministic Multi-Agent Geocoding & Landmark Verification" 
+}) => {
+  const [time, setTime] = useState(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
 
   useEffect(() => {
-    const timer = setInterval(() => setTime(new Date().toLocaleTimeString()), 1000);
+    const timer = setInterval(() => {
+      setTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+    }, 1000);
     return () => clearInterval(timer);
   }, []);
 
   return (
-    <div className="flex flex-col md:flex-row justify-between items-start md:items-center w-full mb-6 gap-4">
+    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center w-full mb-3 pb-2.5 border-b border-white/[0.06] gap-2 flex-shrink-0">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight text-white flex items-center gap-3">
-          Command Center
-          <div className="flex items-center px-2 py-1 rounded bg-electric-glow/10 border border-electric-glow/30 text-electric-glow text-[10px] uppercase tracking-widest font-mono shadow-[0_0_10px_rgba(0,240,255,0.2)]">
-            <span className="w-1.5 h-1.5 rounded-full bg-electric-glow animate-pulse mr-1.5"></span>
-            Live
-          </div>
-        </h1>
-        <p className="text-sm text-slate-400 font-mono tracking-wider mt-1 uppercase">PataAI Geocoding Orchestrator v2.0</p>
+        <div className="flex items-center gap-2">
+          <h1 className="text-lg sm:text-xl font-bold tracking-tight text-white">
+            {title}
+          </h1>
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-mono font-medium bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
+            <Sparkles className="w-2.5 h-2.5 text-cyan-400" />
+            AI Pipeline
+          </span>
+        </div>
+        <p className="text-[11px] text-slate-400 font-normal">
+          {subtitle}
+        </p>
       </div>
 
-      <div className="flex items-center gap-6">
+      <div className="flex items-center gap-2 self-end sm:self-center">
+        <div className="hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-900/60 border border-white/[0.06] text-[11px] font-mono text-slate-300">
+          <Clock className="w-3 h-3 text-cyan-400" />
+          <span>{time}</span>
+        </div>
 
-
-        <div className="flex items-center gap-4">
-          <span className="font-mono text-sm text-electric-glow tracking-widest">{time}</span>
-          
-          <button className="relative p-2 rounded-full hover:bg-white/10 transition-colors text-slate-300 hover:text-white">
-            <Bell size={18} />
-            <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-signal-low shadow-[0_0_5px_rgba(239,68,68,0.8)]"></span>
-          </button>
-          
-          <div className="flex items-center gap-2 cursor-pointer hover:bg-white/5 p-1.5 pr-3 rounded-full transition-colors border border-transparent hover:border-white/10">
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-electric-500 to-purple-deep flex items-center justify-center text-white font-bold text-sm shadow-lg shadow-electric-500/30">
-              {currentUser?.displayName ? currentUser.displayName[0].toUpperCase() : 'A'}
-            </div>
-            <ChevronDown size={14} className="text-slate-400" />
-          </div>
+        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-[11px] font-medium text-emerald-400">
+          <ShieldCheck className="w-3 h-3" />
+          <span>Self-Check: Active</span>
         </div>
       </div>
     </div>

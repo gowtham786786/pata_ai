@@ -1,13 +1,14 @@
 import re
+import math
 from typing import List, Dict, Any, Tuple
 from models.schemas import ExtractedEntities
 from utils.overpass_client import _execute_overpass_query
 from thefuzz import fuzz
 
-class OSMLandmarkAgent:
+class LandmarkSearchAgent:
     """
-    Agent 3: OSM Landmark Intelligence
-    Identifies relationships, generates multiple queries, searches geographically, and ranks landmarks.
+    Agent 3: Landmark Search Intelligence (formerly OSMLandmarkAgent)
+    Identifies relationships, queries OSM and Firebase Mock, returns best candidates + raw fuzzy scores.
     """
     
     RELATION_KEYWORDS = {
@@ -18,15 +19,18 @@ class OSMLandmarkAgent:
         "in front of": "in front of", "inside": "inside"
     }
 
+    MOCK_FIREBASE_LANDMARKS = [
+        {"name": "apollo hospital", "lat": 17.4124, "lon": 78.4143, "source": "Firebase Alias", "distance_meters": 0},
+        {"name": "mg road", "lat": 12.9738, "lon": 77.6119, "source": "Firebase Alias", "distance_meters": 0},
+        {"name": "ramnagar colony", "lat": 17.4101, "lon": 78.5020, "source": "Firebase Alias", "distance_meters": 0},
+    ]
+
     def _extract_relation_and_landmark(self, raw_landmark: str) -> Tuple[str, str]:
         if not raw_landmark:
             return "unknown", ""
             
         lower_lm = raw_landmark.lower().strip()
-        
-        # Sort keys by length descending to match longest first (e.g., 'next to' before 'near')
         sorted_keys = sorted(self.RELATION_KEYWORDS.keys(), key=len, reverse=True)
-        
         for key in sorted_keys:
             if lower_lm.startswith(key + " "):
                 clean = lower_lm[len(key):].strip()
@@ -37,46 +41,25 @@ class OSMLandmarkAgent:
                 
         return "unknown", raw_landmark.strip().title()
 
-    def _normalize_name(self, name: str) -> str:
-        name_lower = name.lower()
-        if "sbi" in name_lower and "bank" not in name_lower:
-            name_lower = name_lower.replace("sbi", "state bank of india")
-        elif "sbi bank" in name_lower:
-            name_lower = name_lower.replace("sbi bank", "state bank of india")
-            
-        replacements = {
-            "rd": "road", "rd.": "road",
-            "st": "saint", "st.": "saint",
-            "govt": "government", "govt.": "government",
-            "hosp": "hospital", "hosp.": "hospital",
-            "sch": "school", "sch.": "school"
-        }
-        
-        tokens = name_lower.split()
-        normalized_tokens = [replacements.get(t, t) for t in tokens]
-        return " ".join(normalized_tokens).title()
+    def _calculate_distance(self, lat1, lon1, lat2, lon2):
+        R = 6371e3
+        phi1 = math.radians(lat1)
+        phi2 = math.radians(lat2)
+        delta_phi = math.radians(lat2 - lat1)
+        delta_lambda = math.radians(lon2 - lon1)
+        a = math.sin(delta_phi / 2.0) ** 2 + \
+            math.cos(phi1) * math.cos(phi2) * \
+            math.sin(delta_lambda / 2.0) ** 2
+        c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+        return R * c
 
-    async def search(self, entities: ExtractedEntities, ref_lat: str, ref_lon: str) -> dict:
+    async def search(self, entities: ExtractedEntities, ref_lat: float, ref_lon: float) -> dict:
         evidence = []
         queries_attempted = []
         candidates = []
         
-        if not ref_lat or not ref_lon:
-            return {
-                "agent": "landmark_search",
-                "status": "error",
-                "relationship": "unknown",
-                "reference_landmark": entities.landmark,
-                "candidates": [],
-                "evidence": ["No reference coordinates available to search OSM."],
-                "queries_attempted": []
-            }
-
-        lat = float(ref_lat)
-        lon = float(ref_lon)
-        radius_meters = 5000  # Expand to 5km to ensure we find landmarks
+        radius_meters = 5000
         
-        # 1. Parse Landmark and Relation
         relation = entities.relation or "unknown"
         clean_landmark = ""
         
@@ -90,110 +73,72 @@ class OSMLandmarkAgent:
             clean_landmark = entities.locality
             
         if not clean_landmark:
+            evidence.append("No landmark or locality provided to search. Continuing pipeline anyway.")
             return {
                 "agent": "landmark_search",
                 "status": "not_found",
                 "relationship": relation,
                 "reference_landmark": None,
                 "candidates": [],
-                "evidence": ["No landmark or locality provided to search."],
+                "evidence": evidence,
                 "queries_attempted": []
             }
             
         evidence.append(f"Parsed landmark '{clean_landmark}' with relationship '{relation}'")
+        search_terms = [clean_landmark]
         
-        # 2. Generate Queries
-        normalized_lm = self._normalize_name(clean_landmark)
-        search_terms = []
-        if normalized_lm != clean_landmark:
-            search_terms.append(normalized_lm)
-            evidence.append(f"Generated normalized query '{normalized_lm}'")
-        search_terms.append(clean_landmark)
-        
-        # Deduplicate
-        search_terms = list(dict.fromkeys(search_terms))
-        evidence.append(f"Searching within {radius_meters}m radius of validated area")
-        
-        # 3. Search OSM
         all_results = []
+        
+        # 1. Search Mock Firebase
+        queries_attempted.append("Firebase Alias Table")
+        for fb_cand in self.MOCK_FIREBASE_LANDMARKS:
+            dist = self._calculate_distance(ref_lat, ref_lon, fb_cand['lat'], fb_cand['lon'])
+            if dist <= radius_meters:
+                c = dict(fb_cand)
+                c['distance_meters'] = dist
+                c['source'] = 'Firebase'
+                all_results.append(c)
+
+        # 2. Search OSM
         for term in search_terms:
             queries_attempted.append(term)
             safe_term = term.replace('"', '').replace("'", "")
             query = f"""
             [out:json][timeout:10];
             (
-              node["name"~"(?i){safe_term}"](around:{radius_meters},{lat},{lon});
-              way["name"~"(?i){safe_term}"](around:{radius_meters},{lat},{lon});
-              relation["name"~"(?i){safe_term}"](around:{radius_meters},{lat},{lon});
+              node["name"~"(?i){safe_term}"](around:{radius_meters},{ref_lat},{ref_lon});
+              way["name"~"(?i){safe_term}"](around:{radius_meters},{ref_lat},{ref_lon});
+              relation["name"~"(?i){safe_term}"](around:{radius_meters},{ref_lat},{ref_lon});
             );
             out center limit 15;
             """
-            res = await _execute_overpass_query(query, lat, lon)
+            res = await _execute_overpass_query(query, ref_lat, ref_lon)
             if res:
                 all_results.extend(res)
                 
-        # 4. Fallback search by category if exact name not found
-        if not all_results:
-            lower_lm = clean_landmark.lower()
-            category = ""
-            if "bank" in lower_lm: category = "bank"
-            elif "hospital" in lower_lm: category = "hospital"
-            elif "school" in lower_lm: category = "school"
-            elif "college" in lower_lm: category = "college"
-            elif "temple" in lower_lm or "mosque" in lower_lm or "church" in lower_lm: category = "place_of_worship"
-            elif "police" in lower_lm: category = "police"
-            
-            if category:
-                queries_attempted.append(f"category:{category}")
-                evidence.append(f"Name search failed. Triggered category fallback: '{category}'")
-                fallback_query = f"""
-                [out:json][timeout:10];
-                (
-                  node["amenity"~"{category}"](around:{radius_meters},{lat},{lon});
-                  way["amenity"~"{category}"](around:{radius_meters},{lat},{lon});
-                );
-                out center limit 15;
-                """
-                res = await _execute_overpass_query(fallback_query, lat, lon)
-                if res:
-                    all_results.extend(res)
-        
-        # 5. Deduplicate and Rank Results
+        # 3. Deduplicate and Calculate Raw Fuzzy Match
         seen_coords = set()
         for r in all_results:
-            # Round coords to 4 decimals to deduplicate very close points (approx 10 meters)
             coord_key = f"{round(r['lat'], 4)}_{round(r['lon'], 4)}"
             if coord_key not in seen_coords:
                 seen_coords.add(coord_key)
-                name_sim = fuzz.token_sort_ratio(normalized_lm.lower(), r.get('name', '').lower())
+                
+                # Use rapidfuzz token_sort_ratio for raw match
+                name_sim = fuzz.token_sort_ratio(clean_landmark.lower(), r.get('name', '').lower())
                 r['match_score'] = name_sim
+                if 'source' not in r:
+                    r['source'] = 'OpenStreetMap'
                 candidates.append(r)
                 
-        if not candidates:
-            evidence.append("No reliable OSM candidate found in the validated search area.")
-            return {
-                "agent": "landmark_search",
-                "status": "not_found",
-                "relationship": relation,
-                "reference_landmark": clean_landmark,
-                "candidates": [],
-                "evidence": evidence,
-                "queries_attempted": queries_attempted
-            }
-            
-        # Sort candidates by match_score desc, then distance asc
+        # We NO LONGER discard. Just sort by match score desc
         candidates.sort(key=lambda x: (-x.get('match_score', 0), x.get('distance_meters', 9999)))
         
         evidence.append(f"Found {len(candidates)} candidate landmarks")
-        
-        best_cand = candidates[0]
-        evidence.append(f"Ranked '{best_cand.get('name', 'Unknown')}' as top candidate")
-        evidence.append(f"Distance from reference coordinate: {round(best_cand.get('distance_meters', 0)/1000, 2)} km")
-        evidence.append("Landmark consistency: HIGH" if best_cand.get('match_score', 0) > 80 else "Landmark consistency: MEDIUM")
+        status = "candidates_found" if candidates else "not_found"
         
         return {
             "agent": "landmark_search",
-            "status": "candidates_found",
+            "status": status,
             "relationship": relation,
             "reference_landmark": clean_landmark,
             "candidates": candidates,

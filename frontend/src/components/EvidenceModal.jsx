@@ -1,14 +1,20 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
-import { X, CheckCircle2, ShieldAlert, Code2, MapPin } from 'lucide-react';
+import { X, ShieldCheck, MapPin, Code2, Copy, Check, Info } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const EvidenceModal = ({ isOpen, onClose, result }) => {
+  const [copied, setCopied] = useState(false);
   if (!isOpen || !result) return null;
   
-  // Find the selected candidate to show the exact evidence
   const candidate = result.candidates?.find(c => c.lat === result.latitude && c.lon === result.longitude) || {};
   const ev = candidate.evidence_details || {};
+
+  const handleCopyJson = () => {
+    navigator.clipboard.writeText(JSON.stringify(result, null, 2));
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   return createPortal(
     <AnimatePresence>
@@ -16,121 +22,121 @@ const EvidenceModal = ({ isOpen, onClose, result }) => {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+        className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/75 backdrop-blur-md p-4"
         onClick={onClose}
       >
         <motion.div
-          initial={{ y: 20, opacity: 0, scale: 0.95 }}
+          initial={{ y: 20, opacity: 0, scale: 0.96 }}
           animate={{ y: 0, opacity: 1, scale: 1 }}
-          exit={{ y: 20, opacity: 0, scale: 0.95 }}
+          exit={{ y: 20, opacity: 0, scale: 0.96 }}
           onClick={(e) => e.stopPropagation()}
-          className="bg-navy-950 border border-slate-700 w-full max-w-4xl max-h-[85vh] rounded-xl shadow-[0_0_50px_rgba(0,0,0,0.5)] flex flex-col overflow-hidden"
+          className="bg-[#0F172A] border border-white/[0.1] w-full max-w-3xl max-h-[85vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden text-slate-200"
         >
           {/* Header */}
-          <div className="flex items-center justify-between p-5 border-b border-slate-800 bg-navy-900">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-white/[0.08] bg-[#0C1322]">
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded bg-electric/20 text-electric flex items-center justify-center border border-electric/30">
-                <ShieldAlert className="w-4 h-4" />
+              <div className="w-8 h-8 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-400 flex items-center justify-center">
+                <ShieldCheck className="w-4 h-4" />
               </div>
-              <h2 className="text-lg font-bold text-slate-200 uppercase tracking-wider">
-                Geospatial Evidence Audit
-              </h2>
+              <div>
+                <h2 className="text-base font-bold text-white tracking-tight">
+                  Geospatial Evidence Audit
+                </h2>
+                <p className="text-xs text-slate-400">Agent Decision Log & Deterministic Scoring Breakdown</p>
+              </div>
             </div>
-            <button
-              onClick={onClose}
-              className="text-slate-400 hover:text-white transition-colors bg-navy-800 hover:bg-slate-700 p-2 rounded-lg"
-            >
-              <X className="w-5 h-5" />
-            </button>
+            
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleCopyJson}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/[0.05] hover:bg-white/[0.1] border border-white/[0.08] text-xs font-medium text-slate-300 hover:text-white transition-colors"
+              >
+                {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                <span>{copied ? 'Copied' : 'Copy JSON'}</span>
+              </button>
+
+              <button
+                onClick={onClose}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/[0.08] transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
           </div>
 
-          {/* Body */}
-          <div className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar">
+          {/* Content */}
+          <div className="flex-1 overflow-y-auto p-6 space-y-6">
             
-            {/* WHY THIS LOCATION Section */}
+            {/* Why This Location Card */}
             <div>
-              <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3 flex items-center gap-2">
-                <MapPin className="w-4 h-4 text-electric" />
-                WHY THIS LOCATION?
-              </h3>
+              <div className="flex items-center gap-2 text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">
+                <MapPin className="w-4 h-4 text-blue-400" />
+                <span>Verification Indicators</span>
+              </div>
               
-              <div className="bg-navy-900 rounded-lg border border-slate-800 overflow-hidden">
-                 <table className="w-full text-left text-sm text-slate-300">
-                    <tbody className="divide-y divide-slate-800/50">
-                       <tr className="hover:bg-slate-800/20">
-                          <td className="px-4 py-3 font-semibold text-slate-400">Pincode</td>
-                          <td className="px-4 py-3">{ev.pincode_match === true ? 'Match' : (ev.pincode_match || 'Mismatch/Unknown')}</td>
-                       </tr>
-                       <tr className="hover:bg-slate-800/20">
-                          <td className="px-4 py-3 font-semibold text-slate-400">City</td>
-                          <td className="px-4 py-3">{ev.city_match === true ? 'Match' : (ev.city_match || 'Mismatch/Unknown')}</td>
-                       </tr>
-                       <tr className="hover:bg-slate-800/20">
-                          <td className="px-4 py-3 font-semibold text-slate-400">Locality</td>
-                          <td className="px-4 py-3">{ev.locality_match === true ? 'Match' : (ev.locality_match || 'Mismatch/Unknown')}</td>
-                       </tr>
-                       <tr className="hover:bg-slate-800/20">
-                          <td className="px-4 py-3 font-semibold text-slate-400">Landmark</td>
-                          <td className="px-4 py-3">{ev.landmark_match === true ? 'Match' : (ev.landmark_match || 'Mismatch/Unknown')}</td>
-                       </tr>
-                       <tr className="hover:bg-slate-800/20">
-                          <td className="px-4 py-3 font-semibold text-slate-400">OSM Verified</td>
-                          <td className="px-4 py-3">{candidate.source === 'OpenStreetMap' ? 'Yes' : 'No'}</td>
-                       </tr>
-                       <tr className="hover:bg-slate-800/20">
-                          <td className="px-4 py-3 font-semibold text-slate-400">Distance from Pincode Centroid</td>
-                          <td className="px-4 py-3">{candidate.distance_from_ref ? `${Math.round(candidate.distance_from_ref)} meters` : 'N/A'}</td>
-                       </tr>
-                       <tr className="hover:bg-slate-800/20">
-                          <td className="px-4 py-3 font-semibold text-slate-400">Direction Match</td>
-                          <td className="px-4 py-3">{ev.direction_match || 'Not Evaluated'}</td>
-                       </tr>
-                       <tr className="hover:bg-slate-800/20">
-                          <td className="px-4 py-3 font-semibold text-slate-400">Final Score</td>
-                          <td className="px-4 py-3 font-bold text-signal-high">{candidate.total_score || result.confidenceScore || 0}/100</td>
-                       </tr>
-                       <tr className="hover:bg-slate-800/20">
-                          <td className="px-4 py-3 font-semibold text-slate-400">Source</td>
-                          <td className="px-4 py-3">{candidate.source || result.locationSource || 'Unknown'}</td>
-                       </tr>
-                    </tbody>
-                 </table>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="p-3.5 rounded-xl bg-slate-900/60 border border-white/[0.06]">
+                  <span className="text-[11px] text-slate-400 block mb-1">Pincode Check</span>
+                  <span className={`text-xs font-semibold px-2 py-0.5 rounded inline-block ${
+                    ev.pincode_match ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-slate-800 text-slate-300'
+                  }`}>
+                    {ev.pincode_match === true ? 'Verified' : (ev.pincode_match || 'Unverified')}
+                  </span>
+                </div>
+
+                <div className="p-3.5 rounded-xl bg-slate-900/60 border border-white/[0.06]">
+                  <span className="text-[11px] text-slate-400 block mb-1">City Match</span>
+                  <span className={`text-xs font-semibold px-2 py-0.5 rounded inline-block ${
+                    ev.city_match ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-slate-800 text-slate-300'
+                  }`}>
+                    {ev.city_match === true ? 'Verified' : (ev.city_match || 'Unverified')}
+                  </span>
+                </div>
+
+                <div className="p-3.5 rounded-xl bg-slate-900/60 border border-white/[0.06]">
+                  <span className="text-[11px] text-slate-400 block mb-1">Locality Overlap</span>
+                  <span className="text-xs font-semibold text-slate-200">
+                    {ev.locality_match || 'N/A'}
+                  </span>
+                </div>
+
+                <div className="p-3.5 rounded-xl bg-slate-900/60 border border-white/[0.06]">
+                  <span className="text-[11px] text-slate-400 block mb-1">Centroid Distance</span>
+                  <span className="text-xs font-mono font-semibold text-cyan-400">
+                    {ev.distance_meters != null ? `${Math.round(ev.distance_meters)}m` : '0m'}
+                  </span>
+                </div>
               </div>
             </div>
 
-            {/* Evidence Audit Trail */}
-            <div>
-              <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3 flex items-center gap-2">
-                <Code2 className="w-4 h-4 text-electric" />
-                Raw Audit Trail
-              </h3>
-              <div className="bg-[#0a0f1c] rounded-lg border border-slate-800 p-4 font-mono text-xs text-slate-300 overflow-x-auto">
-                {result.evidence && result.evidence.length > 0 ? (
-                  <ul className="space-y-2">
-                    {result.evidence.map((evItem, idx) => (
-                      <li key={idx} className="flex gap-3">
-                        <span className="text-slate-600 select-none">[{String(idx + 1).padStart(2, '0')}]</span>
-                        <span className="text-emerald-400">{evItem}</span>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <span className="text-slate-500 italic">No evidence logged.</span>
-                )}
-              </div>
-            </div>
+            {/* Agent Chain Evidence Points */}
+            {result.evidence && result.evidence.length > 0 && (
+              <div>
+                <div className="flex items-center gap-2 text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">
+                  <Info className="w-4 h-4 text-cyan-400" />
+                  <span>Agent Decision Audit Trail</span>
+                </div>
 
-            {/* Parsed Entities */}
-            <div>
-              <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3 flex items-center gap-2">
-                <Code2 className="w-4 h-4 text-electric" />
-                Parsed Entities (JSON)
-              </h3>
-              <div className="bg-[#0a0f1c] rounded-lg border border-slate-800 p-4 overflow-x-auto">
-                <pre className="text-xs text-blue-300 font-mono">
-                  {JSON.stringify(result.parsedEntities || {}, null, 2)}
-                </pre>
+                <div className="space-y-2">
+                  {result.evidence.map((item, idx) => (
+                    <div key={idx} className="p-3 rounded-xl bg-slate-900/40 border border-white/[0.05] text-xs text-slate-300 flex items-start gap-2.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-blue-400 mt-1.5 shrink-0"></span>
+                      <span className="leading-relaxed">{item}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
+            )}
+
+            {/* Raw JSON Preview */}
+            <div>
+              <div className="flex items-center gap-2 text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">
+                <Code2 className="w-4 h-4 text-purple-400" />
+                <span>Payload Data</span>
+              </div>
+              <pre className="p-4 rounded-xl bg-[#070B14] border border-white/[0.06] text-xs font-mono text-slate-300 overflow-x-auto max-h-56 custom-scrollbar">
+                {JSON.stringify(result, null, 2)}
+              </pre>
             </div>
 
           </div>

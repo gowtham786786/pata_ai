@@ -1,24 +1,24 @@
 import time
+import httpx
 from typing import Optional
+from models.schemas import ExtractedEntities
 
 from agents.parser_agent import AddressParserAgent
-from agents.pincode_agent import PincodeVerificationAgent
-from agents.osm_landmark_agent import OSMLandmarkAgent
+from agents.reference_resolver import ReferenceResolverAgent
+from agents.osm_landmark_agent import LandmarkSearchAgent
 from agents.scoring_engine import ScoringEngine
 from agents.self_check_agent import SelfCheckAgent
-from agents.confidence_engine import ConfidenceEngine
 
 # Instantiate singletons
 parser_agent = AddressParserAgent()
-pincode_agent = PincodeVerificationAgent()
-osm_agent = OSMLandmarkAgent()
+reference_resolver = ReferenceResolverAgent()
+landmark_agent = LandmarkSearchAgent()
 scoring_engine = ScoringEngine()
 self_check = SelfCheckAgent()
-confidence_engine = ConfidenceEngine()
 
 async def run_agent_workflow(raw_address: str, force_source: Optional[str] = None) -> dict:
     """
-    Orchestrates the Production-Grade Geocoding Pipeline.
+    Orchestrates the 5-Agent Production-Grade Geocoding Pipeline.
     """
     evidence_log = []
     agent_steps = []
@@ -35,28 +35,71 @@ async def run_agent_workflow(raw_address: str, force_source: Optional[str] = Non
             "status": status
         })
 
-    # --- Agent 1: Address Parser ---
-    t1 = time.perf_counter()
-    parsed = parser_agent.parse(raw_address)
-    evidence_log.append("Agent 1: Extracted landmark, locality, city and pincode")
-    log_step(1, "Agent 1: Address Parser", t1, "Extracted landmark, locality, city and pincode", "Parsed structured JSON", "success")
-
-    # --- Agent 2: Pincode Verifier ---
-    t2 = time.perf_counter()
-    is_valid_pin, pin_data, pin_ev = pincode_agent.verify(parsed.pincode, parsed_city=parsed.city, parsed_state=parsed.state)
-    evidence_log.append(f"Agent 2: {pin_ev}")
-    log_step(2, "Agent 2: Pincode Verifier", t2, "Pincode validated", pin_ev, "success" if is_valid_pin else "warning")
+    is_coordinate = False
     
+    # Coordinate Input Flow Check
+    if "," in raw_address:
+        parts = [p.strip() for p in raw_address.split(',')]
+        if len(parts) == 2:
+            try:
+                lat = float(parts[0])
+                lon = float(parts[1])
+                is_coordinate = True
+            except ValueError:
+                pass
+                
+    if force_source == 'coordinates':
+        is_coordinate = True
+
+    if is_coordinate:
+        # Pre-Agent Flow: Reverse Geocode to generate parsed representation
+        evidence_log.append("Detected raw coordinates input. Executing Reverse-Geocoding.")
+        lat, lon = [float(p.strip()) for p in raw_address.split(',')]
+        
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(f"https://nominatim.openstreetmap.org/reverse?lat={lat}&lon={lon}&format=json", headers={"User-Agent": "PataAI-Backend-Agent"})
+            data = resp.json() if resp.status_code == 200 else {}
+            
+        addr = data.get('address', {})
+        parsed = ExtractedEntities(
+            raw_address=raw_address,
+            pincode=addr.get('postcode'),
+            city=addr.get('city', addr.get('town', addr.get('county'))),
+            locality=addr.get('suburb', addr.get('neighbourhood', addr.get('village')))
+        )
+        pin_data = {
+            'reference_latitude': lat,
+            'reference_longitude': lon,
+            'ref_pincode': addr.get('postcode'),
+            'ref_city': addr.get('city', addr.get('town', addr.get('county'))),
+            'ref_locality': addr.get('suburb', addr.get('neighbourhood', addr.get('village')))
+        }
+        
+        t1 = time.perf_counter()
+        log_step(1, "Agent 1: Address Parser (Skipped)", t1, "Used Reverse-Geocoding", "Coordinates provided", "success")
+        
+        t2 = time.perf_counter()
+        log_step(2, "Agent 2: Reference Resolver (Skipped)", t2, "Used Explicit Coordinates", "Coordinates provided", "success")
+        
+    else:
+        # --- Agent 1: Address Parser ---
+        t1 = time.perf_counter()
+        parsed = parser_agent.parse(raw_address)
+        evidence_log.append("Agent 1: Extracted and normalized landmark, locality, city and pincode")
+        log_step(1, "Agent 1: Address Parser", t1, "Extracted structured fields", "Parsed structured JSON", "success")
+
+        # --- Agent 2: Reference Resolver ---
+        t2 = time.perf_counter()
+        is_valid_pin, pin_data, pin_ev = reference_resolver.resolve(parsed.pincode, parsed_city=parsed.city, parsed_locality=parsed.locality)
+        evidence_log.append(f"Agent 2: {pin_ev}")
+        log_step(2, "Agent 2: Reference Resolver", t2, "Reference location established", pin_ev, "success" if is_valid_pin else "warning")
+
     ref_lat = pin_data.get('reference_latitude')
     ref_lon = pin_data.get('reference_longitude')
     
-    if not ref_lat or not ref_lon:
-        log_step(3, "Agent 3: OSM Landmark Finder", t2, "Skipped", "No reference coordinate available", "error")
-        return build_fallback_response(raw_address, parsed, agent_steps, evidence_log, "No reference pincode coordinate available.")
-
-    # --- Agent 3: Landmark Intelligence ---
+    # --- Agent 3: Landmark Search Intelligence ---
     t3 = time.perf_counter()
-    agent3_result = await osm_agent.search(parsed, ref_lat, ref_lon)
+    agent3_result = await landmark_agent.search(parsed, ref_lat, ref_lon)
     candidates = agent3_result.get('candidates', [])
     for ev in agent3_result.get('evidence', []):
         evidence_log.append(f"Agent 3: {ev}")
@@ -65,36 +108,31 @@ async def run_agent_workflow(raw_address: str, force_source: Optional[str] = Non
     parsed.relation = relation if relation != "unknown" else parsed.relation
     
     log_status = "success" if agent3_result['status'] == 'candidates_found' else ("warning" if agent3_result['status'] == 'not_found' else "error")
-    geo_ev = f"Found {len(candidates)} candidate landmarks" if candidates else "No candidates found via OpenStreetMap."
+    geo_ev = f"Found {len(candidates)} candidate landmarks" if candidates else "No candidates found via OpenStreetMap/Firebase."
     queries_attempted = " and ".join(agent3_result.get('queries_attempted', []))
-    log_step(3, "Agent 3: Landmark Intelligence", t3, geo_ev, queries_attempted if queries_attempted else "No queries attempted", log_status)
-    
-    if not candidates:
-        return build_fallback_response(raw_address, parsed, agent_steps, evidence_log, "No candidates found via Overpass OSM.", float(ref_lat), float(ref_lon))
+    log_step(3, "Agent 3: Landmark Search", t3, geo_ev, queries_attempted if queries_attempted else "No queries attempted", log_status)
 
-    # --- Agent 4: Candidate Ranker / Scoring Engine ---
+    # --- Agent 4: Scorer ---
     t4 = time.perf_counter()
-    candidates = scoring_engine.score_candidates(candidates, parsed, float(ref_lat), float(ref_lon))
-    best_score = candidates[0].get('total_score', 0)
-    log_step(4, "Agent 4: Candidate Ranker", t4, f"Candidate scored {best_score}%", "Deterministically scored candidates", "success")
+    candidates = scoring_engine.score_candidates(candidates, parsed, pin_data)
+    best_score = candidates[0].get('total_score', 0) if candidates else 0
+    log_step(4, "Agent 4: Scorer", t4, f"Top Candidate scored {best_score}%", "Partial credit 100-point scale applied", "success")
 
-    # --- Agent 5: Geospatial Verifier / Self Check ---
+    # --- Agent 5: Self-Check / Composer ---
     t5 = time.perf_counter()
-    passed_check, audit_reason = self_check.review(candidates, parsed)
+    best_cand, conf_level, audit_reason = self_check.compose(candidates, parsed)
     evidence_log.append(f"Agent 5: {audit_reason}")
-    log_step(5, "Agent 5: Geospatial Verifier", t5, "Location evidence verified" if passed_check else audit_reason, "Checked consistency", "success" if passed_check else "warning")
-
-    # --- Agent 6: Confidence Engine ---
-    t6 = time.perf_counter()
-    best_cand, conf_level, explanation = confidence_engine.evaluate(candidates, parsed, passed_check, audit_reason)
-    log_step(6, "Agent 6: Confidence Engine", t6, f"Confidence: {conf_level} ({best_score}%)", explanation, "success" if conf_level == "HIGH" else "warning")
-
-    # --- Agent 7: Response Builder ---
-    t7 = time.perf_counter()
-    log_step(7, "Agent 7: Response Builder", t7, "Final location generated", "Pipeline complete", "success")
+    log_step(5, "Agent 5: Composer", t5, f"Confidence: {conf_level} ({best_score}%)", audit_reason, "success" if conf_level == "HIGH" else "warning")
 
     # Format nearby landmarks for UI
-    nearby_landmarks = candidates[:5] if candidates else []
+    nearby_landmarks = []
+    if candidates:
+        for cand in candidates[:5]:
+            nearby_landmarks.append({
+                "name": cand.get("name", "Unknown"),
+                "distance_from_ref": cand.get("distance_meters", 0),
+                "type": cand.get("type", "node")
+            })
 
     return {
         "status": "success",
@@ -102,8 +140,8 @@ async def run_agent_workflow(raw_address: str, force_source: Optional[str] = Non
         "normalizedAddress": best_cand.get('name', 'Resolved Address') if best_cand else 'Unknown',
         "latitude": best_cand.get('lat') if best_cand else None,
         "longitude": best_cand.get('lon') if best_cand else None,
-        "locationSource": best_cand.get('source', 'OpenStreetMap') if best_cand else "Unknown",
-        "explanation": explanation,
+        "locationSource": best_cand.get('source', 'Unknown') if best_cand else "Unknown",
+        "explanation": audit_reason,
         "confidence": conf_level,
         "confidenceScore": best_cand.get('total_score', 0) if best_cand else 0,
         "evidence": evidence_log,
@@ -111,40 +149,4 @@ async def run_agent_workflow(raw_address: str, force_source: Optional[str] = Non
         "nearbyLandmarks": nearby_landmarks,
         "parsedEntities": parsed.model_dump(),
         "candidates": candidates
-    }
-
-def build_fallback_response(raw_address: str, parsed, agent_steps, evidence_log, reason: str, ref_lat: float = None, ref_lon: float = None):
-    # Add dummy steps for UI if aborted early
-    if len(agent_steps) < 4:
-        agent_steps.append({"id": 4, "name": "Agent 4: Candidate Ranker", "result": "Skipped", "detail": "No candidates to rank", "timeMs": 1, "status": "warning"})
-    if len(agent_steps) < 5:
-        agent_steps.append({"id": 5, "name": "Agent 5: Geospatial Verifier", "result": "Fallback Used", "detail": "Defaulted to pincode centroid", "timeMs": 1, "status": "warning"})
-    
-    return {
-        "status": "success",
-        "originalAddress": raw_address,
-        "normalizedAddress": "Approximate Location (Pincode Centroid)" if ref_lat else "Unable to safely geocode",
-        "latitude": ref_lat,
-        "longitude": ref_lon,
-        "locationSource": "Pincode Centroid" if ref_lat else "Unknown",
-        "explanation": f"LOW CONFIDENCE / REVIEW REQUIRED: {reason} Showing approximate location based on Pincode." if ref_lat else f"LOW CONFIDENCE / REVIEW REQUIRED: {reason}",
-        "confidence": "LOW",
-        "confidenceScore": 30 if ref_lat else 0,
-        "evidence": evidence_log,
-        "agentSteps": agent_steps,
-        "nearbyLandmarks": [{
-            "name": "Pincode Centroid (Fallback)",
-            "distance_from_ref": 0,
-            "type": "node"
-        }] if ref_lat else [],
-        "parsedEntities": parsed.model_dump(),
-        "candidates": [{
-            "name": "Pincode Centroid (Fallback)",
-            "lat": ref_lat,
-            "lon": ref_lon,
-            "distance_from_ref": 0,
-            "source": "Pincode Centroid",
-            "type": "node",
-            "total_score": 30
-        }] if ref_lat else []
     }

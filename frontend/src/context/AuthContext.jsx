@@ -22,28 +22,34 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
-        // Fetch role from Firestore
-        const userDocRef = doc(db, 'users', user.uid);
-        const userDoc = await getDoc(userDocRef);
-        
-        if (userDoc.exists()) {
-          setUserRole(userDoc.data().role || 'user');
-        } else {
-          // If user doc doesn't exist (e.g. first time Google Login), create it
-          await setDoc(userDocRef, {
-            uid: user.uid,
-            name: user.displayName || user.email.split('@')[0],
-            email: user.email,
-            role: 'user',
-            createdAt: new Date().toISOString(),
-            lastLogin: new Date().toISOString()
-          });
+        try {
+          // Fetch role from Firestore
+          const userDocRef = doc(db, 'users', user.uid);
+          const userDoc = await getDoc(userDocRef);
+          
+          if (userDoc.exists()) {
+            setUserRole(userDoc.data().role || 'user');
+          } else {
+            // If user doc doesn't exist (e.g. first time Google Login), create it
+            await setDoc(userDocRef, {
+              uid: user.uid,
+              name: user.displayName || user.email.split('@')[0],
+              email: user.email,
+              role: 'user',
+              createdAt: new Date().toISOString(),
+              lastLogin: new Date().toISOString()
+            });
+            setUserRole('user');
+          }
+          
+          // Update lastLogin on subsequent logins
+          if (userDoc.exists()) {
+             await setDoc(userDocRef, { lastLogin: new Date().toISOString() }, { merge: true });
+          }
+        } catch (error) {
+          console.error("Firestore user profile error (check Firestore Security Rules):", error);
+          // Fallback to default user role so app doesn't hang
           setUserRole('user');
-        }
-        
-        // Update lastLogin on subsequent logins
-        if (userDoc.exists()) {
-           await setDoc(userDocRef, { lastLogin: new Date().toISOString() }, { merge: true });
         }
       } else {
         setUserRole(null);
