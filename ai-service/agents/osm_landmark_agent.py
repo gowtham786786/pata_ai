@@ -3,7 +3,20 @@ import math
 from typing import List, Dict, Any, Tuple
 from models.schemas import ExtractedEntities
 from utils.overpass_client import _execute_overpass_query
-from thefuzz import fuzz
+try:
+    from thefuzz import fuzz
+except ImportError:
+    try:
+        from rapidfuzz import fuzz
+    except ImportError:
+        class DummyFuzz:
+            @staticmethod
+            def ratio(a, b): return 100 if str(a).lower() == str(b).lower() else 0
+            @staticmethod
+            def partial_ratio(a, b): return 100 if str(a).lower() in str(b).lower() or str(b).lower() in str(a).lower() else 0
+            @staticmethod
+            def token_sort_ratio(a, b): return 100 if str(a).lower() == str(b).lower() else 0
+        fuzz = DummyFuzz()
 
 class LandmarkSearchAgent:
     """

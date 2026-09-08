@@ -5,4 +5,7 @@ pandas
 httpx
 python-dotenv
 firebase-admin
+thefuzz
+python-Levenshtein
+requests
 rapidfuzz
